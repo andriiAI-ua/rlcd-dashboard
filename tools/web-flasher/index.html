@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rlcd-dashboard</title>
+<script type="module" src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"></script>
+<style>
+  :root { --bg: #ffffff; --fg: #111111; --muted: #555555; --line: #d0d0d0; --accent: #111111; --accent-fg: #ffffff; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151515; --fg: #eeeeee; --muted: #aaaaaa; --line: #3a3a3a; --accent: #eeeeee; --accent-fg: #151515; }
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 18px; margin: 28px 0 8px; }
+  p, li { color: var(--fg); }
+  small, .muted { color: var(--muted); }
+  img { max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; }
+  ol { padding-left: 22px; }
+  button.flash { font: inherit; font-weight: 600; padding: 12px 22px; border: 0; border-radius: 8px;
+                 background: var(--accent); color: var(--accent-fg); cursor: pointer; }
+  .box { border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin: 16px 0; }
+  a { color: inherit; }
+  code { font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>rlcd-dashboard {{VERSION}}</h1>
+  <p class="muted">Прошивка для Waveshare ESP32-S3-RLCD-4.2 · Firmware for the Waveshare ESP32-S3-RLCD-4.2</p>
+
+  <img src="dashboard.png" alt="Дашборд" width="400" height="300">
+
+  <h2>Прошити з браузера</h2>
+  <ol>
+    <li>Відкрийте цю сторінку в Chrome або Edge на комп'ютері (потрібен Web Serial).</li>
+    <li>Підключіть плату кабелем USB-C, що передає дані.</li>
+    <li>Натисніть кнопку й виберіть порт плати (USB JTAG/serial debug unit).</li>
+  </ol>
+  <esp-web-install-button manifest="manifest.json">
+    <button slot="activate" class="flash">Прошити плату · Flash the board</button>
+    <span slot="unsupported">Цей браузер не вміє Web Serial: відкрийте сторінку в Chrome або Edge на комп'ютері.
+      This browser has no Web Serial: open the page in Chrome or Edge on a computer.</span>
+    <span slot="not-allowed">Потрібне з'єднання HTTPS. · HTTPS is necessary.</span>
+  </esp-web-install-button>
+
+  <div class="box">
+    <p><b>Порту немає в списку?</b> Плата, що спить, не відповідає на USB. Затисніть BOOT, натисніть і відпустіть
+      RESET (або перепідключіть кабель), відпустіть BOOT — плата чекає на прошивку. Після прошивання натисніть RESET.</p>
+    <p><b>Перше прошивання:</b> погодьтеся стерти пристрій (erase). Потім підключіться до точки доступу
+      <code>RLCD-Setup-…</code> (QR-код на екрані) і пройдіть майстер першого налаштування.</p>
+    <p class="muted">No port in the list? A sleeping board does not answer on USB: hold BOOT, press RESET (or plug
+      the cable again), release BOOT. On the first install, erase the device, then connect to the
+      <code>RLCD-Setup-…</code> access point and follow the first-start wizard.</p>
+  </div>
+
+  <h2>Оновлення через Wi-Fi</h2>
+  <p>Прошивка цієї сторінки сама знаходить оновлення: «Перевірити оновлення» на сторінці налаштувань пристрою читає
+    <a href="rlcd-dashboard.tar">rlcd-dashboard.tar</a> (останній реліз). Архів цієї версії: <a href="{{ARCHIVE}}">{{ARCHIVE}}</a>.</p>
+  <p class="muted">The firmware of this page finds updates itself: «Check for an update» on the settings page reads
+    rlcd-dashboard.tar (the last release).</p>
+  <p><small>Прошивка й ця сторінка зібрані з репозиторію автоматично (GitHub Actions). Прошивальник — ESP Web Tools.</small></p>
+</main>
+</body>
+</html>

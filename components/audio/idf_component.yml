@@ -1,0 +1,3 @@
+## Audio codec drivers (ES8311) from the ESP Component Registry, as in the Waveshare audio example.
+dependencies:
+  espressif/esp_codec_dev: "^1.4.0"

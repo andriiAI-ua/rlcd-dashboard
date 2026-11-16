@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+# Copy the sources to the folder of the public repository (GitHub), without the git history of this one.
+#
+#   python tools/export-public.py <folder of the public repository>
+#
+# The files: the tracked files and the new files that git does not ignore, without log/. In the target folder
+# the script keeps .git and the review files (CHANGES.diff, COMMIT_MSG.txt) and deletes the other files that the
+# source does not have; then "git status" there shows the change for the next commit.
+#
+# Before the copy the script looks for the names of the local network in the text files: one regular expression
+# per line in .public-deny (in the project folder, not in git; "#" starts a comment). With a match it shows the
+# file and the line and copies nothing.
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+SKIP_PREFIXES = ('log/',)
+KEEP_IN_TARGET = {'.git', 'CHANGES.diff', 'COMMIT_MSG.txt'}
+BINARY = ('.png', '.ttf', '.bin', '.jpg', '.ico', '.pdf')
+
+
+def source_files():
+    out = subprocess.run(['git', '-C', ROOT, 'ls-files', '-co', '--exclude-standard', '-z'],
+                         check=True, capture_output=True).stdout.decode('utf-8')
+    files = sorted({f for f in out.split('\0') if f})
+    return [f for f in files if not f.startswith(SKIP_PREFIXES) and os.path.isfile(os.path.join(ROOT, f))]
+
+
+def deny_patterns():
+    path = os.path.join(ROOT, '.public-deny')
+    if not os.path.isfile(path):
+        sys.exit('No .public-deny: write the names of the local network there first (one regular expression a line).')
+    patterns = []
+    with open(path, encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                patterns.append(re.compile(line, re.IGNORECASE))
+    return patterns
+
+
+def check(files, patterns):
+    found = 0
+    for rel in files:
+        if rel.lower().endswith(BINARY):
+            continue
+        with open(os.path.join(ROOT, rel), 'rb') as f:
+            text = f.read().decode('utf-8', errors='replace')
+        for number, line in enumerate(text.splitlines(), 1):
+            for p in patterns:
+                if p.search(line):
+                    print('%s:%d: %s  [%s]' % (rel, number, line.strip()[:120], p.pattern))
+                    found += 1
+    return found
+
+
+def main():
+    if len(sys.argv) != 2:
+        sys.exit(__doc__ if __doc__ else 'usage: export-public.py <folder>')
+    target = os.path.abspath(sys.argv[1])
+    if target == ROOT or target.startswith(ROOT + os.sep):
+        sys.exit('The target must be outside the project folder.')
+    files = source_files()
+    found = check(files, deny_patterns())
+    if found:
+        sys.exit('%d lines have names of the local network: nothing is copied.' % found)
+
+    os.makedirs(target, exist_ok=True)
+    wanted = set(files)
+    # Delete the files of the target that the source does not have.
+    for dirpath, dirnames, filenames in os.walk(target, topdown=True):
+        rel_dir = os.path.relpath(dirpath, target).replace(os.sep, '/')
+        if rel_dir == '.':
+            dirnames[:] = [d for d in dirnames if d not in KEEP_IN_TARGET]
+        for name in filenames:
+            rel = name if rel_dir == '.' else rel_dir + '/' + name
+            if rel not in wanted and not (rel_dir == '.' and name in KEEP_IN_TARGET):
+                os.remove(os.path.join(dirpath, name))
+    for dirpath, dirnames, filenames in os.walk(target, topdown=False):
+        if dirpath != target and not os.listdir(dirpath) and '.git' not in dirpath.split(os.sep):
+            os.rmdir(dirpath)
+    # Copy the files byte for byte (the line ends stay as in the working copy).
+    for rel in files:
+        dst = os.path.join(target, rel)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copyfile(os.path.join(ROOT, rel), dst)
+    print('%d files are in %s' % (len(files), target))
+
+
+if __name__ == '__main__':
+    main()

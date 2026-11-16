@@ -1,0 +1,106 @@
+# Build the firmware on GitHub: at each push and pull request, and a release for a tag "v*".
+# The release archive build/rlcd-dashboard-<version>.tar is the file for the update over Wi-Fi.
+# A tag also makes the GitHub Pages site (Settings -> Pages -> Source: GitHub Actions): the web flasher for
+# Chrome and Edge, and the archive as rlcd-dashboard.tar; the firmware of this build offers that address for
+# "Перевірити оновлення".
+#
+# Signing: put the PEM text of rlcd-signing-key.pem into the repository secret RLCD_SIGNING_KEY
+# (Settings -> Secrets and variables -> Actions). Without the secret (for example in a fork) the build uses
+# a temporary key: devices with your key do not accept that firmware.
+name: Build
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: espressif/idf:v6.1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # git-version.cmake reads the revision and the tags
+
+      - name: Signing key
+        shell: bash
+        env:
+          SIGNING_KEY: ${{ secrets.RLCD_SIGNING_KEY }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if [ -n "$SIGNING_KEY" ]; then
+            printf '%s\n' "$SIGNING_KEY" > rlcd-signing-key.pem
+            echo "Signed with the key of the repository secret RLCD_SIGNING_KEY." >> "$GITHUB_STEP_SUMMARY"
+          else
+            . "$IDF_PATH/export.sh" > /dev/null
+            espsecure generate-signing-key --version 2 rlcd-signing-key.pem
+            echo "**No RLCD_SIGNING_KEY secret: signed with a temporary key.** Devices with your key do not accept this firmware." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Update address
+        shell: bash
+        env:
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+        run: |
+          # The defaults of the build (the secrets file is not in git): the GitHub Pages address of this repository.
+          url="https://${OWNER,,}.github.io/${REPO}/rlcd-dashboard.tar"
+          printf 'CONFIG_RLCD_OTA_URL="%s"\n' "$url" > sdkconfig.secrets
+          echo "Update address: $url" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build
+        shell: bash
+        run: |
+          . "$IDF_PATH/export.sh" > /dev/null
+          idf.py build
+          rm -f rlcd-signing-key.pem
+          ls -l build/*.tar build/*.bin
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rlcd-dashboard
+          path: |
+            build/rlcd-dashboard-*.tar
+            build/rlcd-dashboard.bin
+            build/bootloader/bootloader.bin
+            build/partition_table/partition-table.bin
+            build/ota_data_initial.bin
+            build/flasher_args.json
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/rlcd-dashboard-*.tar
+
+      # GitHub Pages: the web flasher (ESP Web Tools: Chrome and Edge flash the board through Web Serial) and
+      # rlcd-dashboard.tar, always the last release, with the versioned archive next to it.
+      - name: Pages files
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: python3 tools/web-flasher/make_site.py build site "${GITHUB_REF_NAME}"
+
+      - uses: actions/upload-pages-artifact@v3
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          path: site
+
+  pages:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

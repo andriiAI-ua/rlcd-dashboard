@@ -1,0 +1,3 @@
+## MQTT client from the ESP Component Registry (it is not part of ESP-IDF 6.x).
+dependencies:
+  espressif/mqtt: "^1.0.0"

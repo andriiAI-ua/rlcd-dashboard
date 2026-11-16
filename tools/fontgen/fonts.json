@@ -1,0 +1,31 @@
+{
+  "output": "../../components/gfx",
+  "files": [ "fonts/Roboto-Regular.ttf", "fonts/Roboto-Bold.ttf" ],
+  "charsets": {
+    "text": [
+      [32, 126],
+      [160, 160], [171, 171], [176, 176], [183, 183], [187, 187],
+      [700, 700],
+      [1024, 1119], [1168, 1169],
+      [8211, 8212], [8217, 8217], [8230, 8230], [8470, 8470], [8722, 8722]
+    ],
+    "digits": [
+      [32, 32], [37, 37], [43, 46], [48, 58], [176, 176], [8212, 8212], [8722, 8722]
+    ]
+  },
+  "fonts": [
+    { "name": "roboto_r13", "style": "Regular", "size": 13, "charset": "text" },
+    { "name": "roboto_r14", "style": "Regular", "size": 14, "charset": "text" },
+    { "name": "roboto_r17", "style": "Regular", "size": 17, "charset": "text" },
+    { "name": "roboto_b14", "style": "Bold", "size": 14, "charset": "text" },
+    { "name": "roboto_b15", "style": "Bold", "size": 15, "charset": "text" },
+    { "name": "roboto_b18", "style": "Bold", "size": 18, "charset": "text" },
+    { "name": "roboto_b20", "style": "Bold", "size": 20, "charset": "text" },
+    { "name": "roboto_b24", "style": "Bold", "size": 24, "charset": "text" },
+    { "name": "roboto_b26", "style": "Bold", "size": 26, "charset": "text" },
+    { "name": "roboto_b30", "style": "Bold", "size": 30, "charset": "text" },
+    { "name": "roboto_b40", "style": "Bold", "size": 40, "charset": "text" },
+    { "name": "roboto_b56d", "style": "Bold", "size": 56, "charset": "digits" },
+    { "name": "roboto_b64d", "style": "Bold", "size": 64, "charset": "digits" }
+  ]
+}

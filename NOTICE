@@ -1,0 +1,14 @@
+rlcd-dashboard
+
+This project has material from other projects:
+
+- Roboto fonts (tools/fontgen/fonts/*.ttf, version 2.001047) and the bitmap fonts made from them
+  (components/gfx/fonts/*.c): Copyright Google, Apache License 2.0, see tools/fontgen/fonts/LICENSE.txt.
+  Roboto is a trademark of Google.
+- The init sequence and the pixel layout of the ST7305 display (components/st7305) and the setup of the
+  ES8311 codec (components/audio) follow the examples of Waveshare for the ESP32-S3-RLCD-4.2
+  (Apache License 2.0).
+- components/dns_server: from the captive portal example of ESP-IDF, Copyright Espressif Systems,
+  Unlicense OR CC0-1.0.
+- The managed components (espressif/mqtt, espressif/cjson, espressif/qrcode, espressif/esp_codec_dev)
+  come from the ESP Component Registry at build time, under their own licenses.

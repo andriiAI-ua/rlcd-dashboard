@@ -1,0 +1,31 @@
+# ESP-IDF build output and the generated configuration
+build/
+build-check/
+managed_components/
+sdkconfig
+sdkconfig.old
+
+# Local secrets: Wi-Fi password, Home Assistant token
+sdkconfig.secrets
+
+# Private keys: the firmware signing key and any other key never go to git
+*.pem
+*.key
+
+# Font generator build output
+tools/fontgen/bin/
+tools/fontgen/obj/
+
+# Editors
+.vscode/
+.vs/
+
+# Review files
+CHANGES.diff
+COMMIT_MSG.txt
+
+# ESP-IDF logs of failed commands (idf.py writes them to log/ in the project folder)
+log/
+
+# The names of the local network that tools/export-public.py must not copy to the public repository
+.public-deny

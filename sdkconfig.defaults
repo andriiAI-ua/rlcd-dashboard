@@ -1,0 +1,42 @@
+# Waveshare ESP32-S3-RLCD-4.2: ESP32-S3-WROOM-1-N16R8 (16 MB flash, 8 MB octal PSRAM)
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+
+CONFIG_FREERTOS_HZ=1000
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+# Updates over Wi-Fi: a new firmware that does not confirm itself goes back to the previous one.
+# Do not enable the anti-rollback option: it burns eFuses.
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+
+# Only signed firmware updates (RSA-3072 signature block, the Secure Boot V2 scheme). This is not hardware
+# secure boot: no eFuses are burned, and USB flashing stays possible. The running firmware checks a new
+# firmware with its own public key. The build signs with the private key below; keep it out of git.
+CONFIG_SECURE_SIGNED_APPS_NO_SECURE_BOOT=y
+CONFIG_SECURE_SIGNED_APPS_RSA_SCHEME=y
+CONFIG_SECURE_SIGNED_ON_UPDATE_NO_SECURE_BOOT=y
+CONFIG_SECURE_BOOT_BUILD_SIGNED_BINARIES=y
+CONFIG_SECURE_BOOT_SIGNING_KEY="rlcd-signing-key.pem"
+
+# HTTPS for the settings page with a certificate of the own CA. The device makes its key and
+# the certificate request (CSR) itself. TLS buffers go to PSRAM: the internal RAM stays for Wi-Fi.
+CONFIG_ESP_HTTPS_SERVER_ENABLE=y
+CONFIG_MBEDTLS_X509_CREATE_C=y
+CONFIG_MBEDTLS_X509_CSR_WRITE_C=y
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
+CONFIG_LWIP_MAX_SOCKETS=16
+
+# Power management. On battery the firmware turns on the automatic light sleep: the chip sleeps between
+# the Wi-Fi beacons and stays connected. A computer on USB stops it, so that the USB log works.
+CONFIG_PM_ENABLE=y
+CONFIG_FREERTOS_USE_TICKLESS_IDLE=y
+CONFIG_USJ_NO_AUTO_LS_ON_CONNECTION=y
+
+# Home Assistant, its entities, the forecast city and the other values of your home network: on the settings
+# page of the device (the first-start wizard), or in sdkconfig.secrets (see sdkconfig.secrets.example).

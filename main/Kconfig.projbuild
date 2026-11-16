@@ -1,0 +1,219 @@
+menu "RLCD dashboard"
+
+    comment "Start values. The settings page on the device changes them (they go to NVS)."
+
+    config RLCD_WIFI_SSID
+        string "Wi-Fi network name (SSID)"
+        default ""
+        help
+            Name of the main Wi-Fi network.
+            Put the value in sdkconfig.secrets, not in sdkconfig.defaults.
+
+    config RLCD_WIFI_PASSWORD
+        string "Wi-Fi password"
+        default ""
+
+    config RLCD_WIFI2_SSID
+        string "Backup Wi-Fi network name (SSID)"
+        default ""
+        help
+            The device uses this network when the main network is not available.
+
+    config RLCD_WIFI2_PASSWORD
+        string "Backup Wi-Fi password"
+        default ""
+
+    config RLCD_DNS1
+        string "DNS server 1"
+        default ""
+        help
+            IPv4 address of a DNS server, for example 192.168.1.1.
+            Keep it empty to use the DNS servers from DHCP.
+
+    config RLCD_DNS2
+        string "DNS server 2"
+        default ""
+
+    config RLCD_MQTT_URI
+        string "MQTT broker"
+        default ""
+        help
+            For example mqtt://homeassistant.local:1883. Keep it empty to disable MQTT.
+
+    config RLCD_MQTT_USER
+        string "MQTT user"
+        default ""
+
+    config RLCD_MQTT_PASSWORD
+        string "MQTT password"
+        default ""
+
+    config RLCD_MQTT_PREFIX
+        string "Home Assistant discovery prefix"
+        default "homeassistant"
+
+    config RLCD_WEB_PASSWORD
+        string "Settings page password"
+        default ""
+        help
+            Password of the settings page on the home network (user "admin").
+            If it is empty, the page opens without a password on the home network too.
+
+    comment "Home Assistant data (start values)"
+
+    config RLCD_HA_URL
+        string "Home Assistant address"
+        default ""
+        help
+            For example http://homeassistant.local:8123. Keep it empty to show no data from Home Assistant.
+
+    config RLCD_HA_TOKEN
+        string "Home Assistant long-lived access token"
+        default ""
+        help
+            Make it in Home Assistant: Profile -> Security -> Long-lived access tokens.
+            Put the value in sdkconfig.secrets, not in sdkconfig.defaults.
+
+    config RLCD_E_TEMP
+        string "Outdoor temperature entities"
+        default ""
+        help
+            The main entity first, then the fallback entities, separated by commas.
+
+    config RLCD_E_HUM
+        string "Outdoor humidity entities"
+        default ""
+
+    config RLCD_E_AQI
+        string "Air quality index entities"
+        default ""
+
+    config RLCD_E_VOLT
+        string "UPS input voltage entities"
+        default ""
+
+    config RLCD_E_UPS
+        string "UPS status entity (NUT: OL / OB)"
+        default ""
+
+    config RLCD_E_DRONE
+        string "Drone alert entity (on/off)"
+        default ""
+
+    config RLCD_E_MISSILE
+        string "Missile alert entity (on/off)"
+        default ""
+
+    config RLCD_E_OFF
+        string "Next power off entity"
+        default ""
+
+    config RLCD_E_ON
+        string "Next power on entity"
+        default ""
+
+    config RLCD_E_DTEK
+        string "Grid power (DTEK) entity (on/off)"
+        default ""
+        help
+            Keep it empty if Home Assistant has no such entity: then the screen uses the UPS and the schedule.
+            A healthchecks.io check (see below) has priority over this entity.
+
+    config RLCD_HC_KEY
+        string "healthchecks.io read-only API key"
+        default ""
+        help
+            Project Settings -> API Access -> read-only key. With a check, it gives the DTEK power:
+            the check is "up" when the grid has power.
+            Put the value in sdkconfig.secrets, not in sdkconfig.defaults.
+
+    config RLCD_HC_CHECK
+        string "healthchecks.io check (slug, UUID or unique_key)"
+        default ""
+
+    config RLCD_POWER_QUEUE
+        string "Power queue label"
+        default ""
+        help
+            For example "черга 1.1".
+
+    config RLCD_METEO_STATION
+        string "meteo.gov.ua station for the forecast"
+        default ""
+        help
+            WMO index of the station, for example 33345 (Kyiv). Keep it empty for no forecast.
+            The settings page and Home Assistant select a regional centre from a list.
+
+    config RLCD_SERVER_URL
+        string "trmnl-server image for the server screen"
+        default ""
+        help
+            The BMP image (400 x 300, 1 bit) of the "З сервера" screen, for example
+            http://server:15000/quad.bmp. The settings page changes it.
+
+    config RLCD_OTA_URL
+        string "Firmware archive for the update"
+        default ""
+        help
+            The URL that the settings page offers for "Перевірити оновлення". The build on GitHub sets
+            the GitHub Pages address of its repository: https://<owner>.github.io/<repository>/rlcd-dashboard.tar.
+
+    config RLCD_ALERT_REGION
+        string "Alert region of ubilling.net.ua"
+        default ""
+        help
+            The region for the alerts when the Home Assistant alert entities are empty, as the key of
+            the ubilling.net.ua answer: for example "м. Київ" or "Київська область". Keep it empty for no alerts.
+            The settings page and Home Assistant select it from a list.
+
+    config RLCD_ECO_MINUTES
+        string "Minutes between the updates in eco mode"
+        default "30"
+        help
+            Home Assistant changes it through MQTT (number "Оновлення в економному режимі").
+
+    comment "Device"
+
+    config RLCD_LANGUAGE
+        string "Language (uk, en)"
+        default "uk"
+        help
+            The language of the screen, the settings page and Home Assistant: the code of a file in lang/.
+            The settings page changes it.
+
+    config RLCD_AP_IP
+        string "Setup access point address"
+        default "10.0.0.1"
+        help
+            IPv4 address of the device in its own access point (network /24).
+            Use an address that is not in your home network.
+
+    config RLCD_TZ
+        string "Time zone (POSIX TZ string)"
+        default "EET-2EEST,M3.5.0/3,M10.5.0/4"
+        help
+            Local time zone. The default is Europe/Kyiv.
+
+    config RLCD_NTP_SERVER
+        string "NTP server"
+        default "pool.ntp.org"
+
+    config RLCD_ROOM_TEMP_OFFSET_X10
+        int "Room temperature correction, 0.1 degree Celsius"
+        range -100 100
+        default 0
+        help
+            Add this value to the SHTC3 temperature. The board makes some heat,
+            so a negative value can be necessary. For example, -15 is -1.5 degrees.
+
+    config RLCD_VBUS_SENSE_GPIO
+        int "GPIO that senses USB power (-1 = none)"
+        range -1 48
+        default -1
+        help
+            The board has no signal for USB power. Without it, the firmware
+            finds USB power from the USB data connection and the battery voltage.
+            For an exact signal, connect VBUS of the 2x8 header through a
+            100K/100K divider to a free GPIO (for example 2) and set it here.
+
+endmenu

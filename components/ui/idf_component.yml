@@ -1,0 +1,3 @@
+## QR code generator from the ESP Component Registry: the setup screen shows the Wi-Fi QR code.
+dependencies:
+  espressif/qrcode: "*"
