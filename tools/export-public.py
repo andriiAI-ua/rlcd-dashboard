@@ -3,7 +3,8 @@
 #
 #   python tools/export-public.py <folder of the public repository>
 #
-# The files: the tracked files and the new files that git does not ignore, without log/. In the target folder
+# The files: the tracked files and the new files that git does not ignore, without log/. The public repository is
+# in English: README.en.md goes there as README.md, and the Ukrainian README.md stays here. In the target folder
 # the script keeps .git and the review files (CHANGES.diff, COMMIT_MSG.txt) and deletes the other files that the
 # source does not have; then "git status" there shows the change for the next commit.
 #
@@ -18,6 +19,8 @@ import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 SKIP_PREFIXES = ('log/',)
+# A source file under another name in the target; the source file of that other name does not go there.
+PUBLIC_NAMES = {'README.en.md': 'README.md'}
 KEEP_IN_TARGET = {'.git', 'CHANGES.diff', 'COMMIT_MSG.txt'}
 BINARY = ('.png', '.ttf', '.bin', '.jpg', '.ico', '.pdf')
 
@@ -26,7 +29,20 @@ def source_files():
     out = subprocess.run(['git', '-C', ROOT, 'ls-files', '-co', '--exclude-standard', '-z'],
                          check=True, capture_output=True).stdout.decode('utf-8')
     files = sorted({f for f in out.split('\0') if f})
-    return [f for f in files if not f.startswith(SKIP_PREFIXES) and os.path.isfile(os.path.join(ROOT, f))]
+    files = [f for f in files if not f.startswith(SKIP_PREFIXES) and os.path.isfile(os.path.join(ROOT, f))]
+    replaced = {target for source, target in PUBLIC_NAMES.items() if source in files}
+    return [f for f in files if f not in replaced]
+
+
+def target_name(rel):
+    return PUBLIC_NAMES.get(rel, rel)
+
+
+def check_translation():
+    """Warn when the Ukrainian README changed after the English one: the translation may be old."""
+    uk, en = os.path.join(ROOT, 'README.md'), os.path.join(ROOT, 'README.en.md')
+    if os.path.isfile(uk) and os.path.isfile(en) and os.path.getmtime(uk) > os.path.getmtime(en) + 1:
+        print('Note: README.md changed after README.en.md: update the English README for the public repository.')
 
 
 def deny_patterns():
@@ -67,9 +83,10 @@ def main():
     found = check(files, deny_patterns())
     if found:
         sys.exit('%d lines have names of the local network: nothing is copied.' % found)
+    check_translation()
 
     os.makedirs(target, exist_ok=True)
-    wanted = set(files)
+    wanted = {target_name(f) for f in files}
     # Delete the files of the target that the source does not have.
     for dirpath, dirnames, filenames in os.walk(target, topdown=True):
         rel_dir = os.path.relpath(dirpath, target).replace(os.sep, '/')
@@ -84,7 +101,7 @@ def main():
             os.rmdir(dirpath)
     # Copy the files byte for byte (the line ends stay as in the working copy).
     for rel in files:
-        dst = os.path.join(target, rel)
+        dst = os.path.join(target, target_name(rel))
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copyfile(os.path.join(ROOT, rel), dst)
     print('%d files are in %s' % (len(files), target))

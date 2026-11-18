@@ -1,339 +1,341 @@
 # rlcd-dashboard
 
-Автономна прошивка для плати **Waveshare ESP32-S3-RLCD-4.2** (відбивний РК-екран 400×300, 1 біт). Пристрій сам збирає дані й сам малює екран, сервер йому не потрібен. Макет і шрифти повторюють компактний екран `trmnl-server` (400×300).
+Standalone firmware for the **Waveshare ESP32-S3-RLCD-4.2** board (reflective LCD, 400×300, 1 bit). The device collects its data and draws the screen itself; it does not need a server. The layout and the fonts follow the compact screen of `trmnl-server` (400×300).
 
-Стан: **0.1.0**. Дашборд з даними Home Assistant (погода й повітря надворі, тривоги, світло) і прогнозом meteo.gov.ua, тривоги з ubilling.net.ua без HA, сім екранів, чотири режими роботи (від постійного підключення до повної автономності) і два режими при розряді батареї, годинник DS3231 або PCF85063, Wi-Fi з запасною мережею й аварійною точкою доступу, сторінка налаштувань на самому пристрої з майстром першого запуску, MQTT для Home Assistant, оновлення через Wi-Fi, українська й англійська мови.
+Version **0.1.0**: a dashboard with Home Assistant data (outdoor weather and air, air raid alerts, power) and the meteo.gov.ua forecast, air raid alerts from ubilling.net.ua without Home Assistant, seven screens, four modes of operation (from an always-on connection to fully offline) and two low-battery modes, a DS3231 or PCF85063 clock, Wi-Fi with a backup network and a fallback access point, a settings page on the device with a first-start wizard, MQTT for Home Assistant, signed updates over Wi-Fi, Ukrainian and English.
 
-## Екрани
+The texts below use the English names of the screens and the settings; the firmware starts in Ukrainian, and the first-start wizard or the settings page switches the language.
 
-| Екран | Вигляд | Що показує | Потрібно |
+## Screens
+
+| Screen | Look | What it shows | Needs |
 |---|---|---|---|
-| **Дашборд** | [![Дашборд](docs/screens/uk/dashboard-small.png)](docs/screens/uk/dashboard.png) | Як компактний екран `trmnl-server`: дата, температура надворі зі зміною за добу, прогноз на завтра; смуга тривоги; «Повітря надворі» (вологість, AQI, зміни за добу); «Світло» (стан, напруга ДБЖ, наступне вимкнення чи увімкнення); унизу прогрес року, час даних і батарея | Home Assistant |
-| **Кімната** | [![Кімната](docs/screens/uk/room-small.png)](docs/screens/uk/room.png) | Дата й годинник, температура й вологість у кімнаті (SHTC3), коротко погода надворі (з HA, якщо він є) | — |
-| **Текст** | [![Текст](docs/screens/uk/note-small.png)](docs/screens/uk/note.png) | Дата й годинник угорі, нижче — ваш текст зі сторінки налаштувань (до 250 символів, рядки — з Enter). Шрифт добирається сам: що коротший текст, то більші літери | непорожній текст |
-| **4 квадрати** | [![4 квадрати](docs/screens/uk/quad-small.png)](docs/screens/uk/quad.png) | Екран поділено на 4 рівні частини, ліва верхня й права нижня — чорні. Великим шрифтом: дата й час (`13.11` і `9:24`, 64 px); температура надворі (56 px) і AQI; тривога (з рамкою й знаком, коли вона є); світло — стан і наступна зміна. У лівому верхньому куті маленькі значки: «ЕКО» (лише першу хвилину після переходу в економний режим), перекреслений Wi-Fi без зв'язку, «Потрібно зарядити»; у верхніх кутах білого квадрата, чорним: батарея ліворуч (з блискавкою на USB), відсоток заряду праворуч; температура на 5 px нижче, щоб вони не налазили на неї | Home Assistant |
-| **З сервера** | [![З сервера](docs/screens/uk/server-small.png)](docs/screens/uk/server.png) | Ті самі 4 квадрати, але три з них малює `trmnl-server` (картинка раз на 5 хв), а верхній лівий — дату, час і значки — пристрій щохвилини сам (див. «Екран з сервера») | trmnl-server |
-| **Годинник** | [![Годинник](docs/screens/uk/clock-small.png)](docs/screens/uk/clock.png) | Автономний режим: угорі на чорному — день тижня й дата, під ними великим шрифтом час; нижче температура й вологість у кімнаті (SHTC3); унизу заряд батареї й позначка «АВТОНОМНО». Wi-Fi, MQTT і дані з HA вимкнені (див. «Годинник (автономний режим)») | — |
-| **Дні року** | [![Дні року](docs/screens/uk/days-small.png)](docs/screens/uk/days.png) | Лише при заряді нижче 2 % (екстремальне енергозбереження), як екран DaysInYear у `trmnl-server`: дата з роком, скільки днів року минуло й скільки залишилось; унизу на чорному «Потрібно зарядити · N %» і «Звʼязку немає, екран оновлюється раз на добу». Його немає в колі KEY, на сторінці й у HA, він не зберігається | — |
-| Налаштування Wi-Fi | [![Налаштування Wi-Fi](docs/screens/uk/setup-small.png)](docs/screens/uk/setup.png) | Вмикається сам разом із точкою доступу: назва мережі, пароль, QR-код | — |
-| Повідомлення | [![Повідомлення](docs/screens/uk/message-small.png)](docs/screens/uk/message.png) | Чорна плашка посередині екрана: «Оновлення прошивки…», «Скидання налаштувань…» | — |
+| **Dashboard** | [![Dashboard](docs/screens/en/dashboard-small.png)](docs/screens/en/dashboard.png) | As the compact screen of `trmnl-server`: the date, the outdoor temperature with its 24-hour change, tomorrow's forecast; the alert strip; "Air outdoors" (humidity, AQI, 24-hour changes); "Power" (state, UPS voltage, next outage or power back); at the bottom the year progress, the data time and the battery | Home Assistant |
+| **Room** | [![Room](docs/screens/en/room-small.png)](docs/screens/en/room.png) | The date and the clock, the room temperature and humidity (SHTC3), a short line about the weather outdoors (from Home Assistant, when there is one) | — |
+| **Note** | [![Note](docs/screens/en/note-small.png)](docs/screens/en/note.png) | The date and the clock at the top, below them your text from the settings page (up to 250 characters, new lines with Enter). The font size is automatic: a shorter text gets larger letters | a text |
+| **4 quadrants** | [![4 quadrants](docs/screens/en/quad-small.png)](docs/screens/en/quad.png) | The screen in 4 equal parts, the top left and the bottom right ones black. In large type: the date and the time (`13.11` and `9:24`, 64 px); the outdoor temperature (56 px) and AQI; the alert (with a frame and a warning sign when there is one); the power state and the next change. Small icons at the top left: "ECO" (only in the first minute after the switch to eco mode), a crossed Wi-Fi icon without a connection, "Charge the battery"; in the top corners of the white quadrant, in black: the battery at the left (with a bolt on USB power), the charge percent at the right | Home Assistant |
+| **From server** | [![From server](docs/screens/en/server-small.png)](docs/screens/en/server.png) | The same 4 quadrants, but `trmnl-server` draws three of them (an image every 5 min), and the device draws the top left one (the date, the time and the icons) itself each minute (see "The server screen") | trmnl-server |
+| **Clock** | [![Clock](docs/screens/en/clock-small.png)](docs/screens/en/clock.png) | The offline mode: the weekday and the date on black at the top, the time in large digits under them; the room temperature and humidity (SHTC3) below; the battery and "OFFLINE" at the bottom. Wi-Fi, MQTT and the Home Assistant data are off (see "Clock (offline mode)") | — |
+| **Days of the year** | [![Days of the year](docs/screens/en/days-small.png)](docs/screens/en/days.png) | Only below 2 % battery (extreme power saving), as the DaysInYear screen of `trmnl-server`: the date with the year, the days of the year that passed and that are left; on black at the bottom "Charge the battery · N %" and "No connection, the screen changes once a day". It is not in the KEY cycle, on the page or in Home Assistant, and it is not kept | — |
+| Wi-Fi setup | [![Wi-Fi setup](docs/screens/en/setup-small.png)](docs/screens/en/setup.png) | Comes on with the access point: the network name, the password, a QR code | — |
+| Message | [![Message](docs/screens/en/message-small.png)](docs/screens/en/message.png) | A black box in the middle of the screen: "Firmware update…", "Resetting the settings…" | — |
 
-Мініатюри — у половину розміру, клік відкриває екран повністю (у 2 рази більше за 400 × 300). Їх малює код прошивки з тестовими даними: `tools/screens/render.py` збирає `components/ui`, шрифти й тексти для комп'ютера (gcc на Linux або в WSL: `python3 tools/screens/render.py`) і пише `docs/screens/uk/` і `docs/screens/en/`. Після зміни екранів перегенеруйте їх.
+The thumbnails are half size; a click opens the full screen (twice 400 × 300). The firmware code draws them with sample data: `tools/screens/render.py` builds `components/ui`, the fonts and the texts for a computer (gcc on Linux or in WSL: `python3 tools/screens/render.py`) and writes `docs/screens/uk/` and `docs/screens/en/`. Make them again after a change of the screens.
 
-Кнопка KEY перемикає екрани по колу; вибір зберігається і переживає перезапуск. У колі лише доступні екрани: «Текст» — коли він не порожній, «Дашборд» і «4 квадрати» — коли є Home Assistant, «З сервера» — коли є trmnl-server (див. «Перше налаштування»). На сторінці налаштувань, у розділі «Екран», кнопки перемикають екран одразу, без перезапуску, а «Показати текст» зберігає новий текст і одразу його показує; екран можна вибрати й у HA. Перекреслений значок Wi-Fi з'являється лише тоді, коли пристрій мав би бути на зв'язку, але не підключений; в економному режимі й на «З сервера» Wi-Fi вимкнено навмисно, тож значка немає. Інформація про пристрій (IP, джерело часу, MQTT, батарея, стан HA, тривоги, часовий пояс, економний режим) — на сторінці налаштувань, у блоці «Пристрій».
+The KEY button changes the screens in a circle; the choice is kept, also after a restart. The circle has only the available screens: "Note" when it has a text, "Dashboard" and "4 quadrants" when there is Home Assistant, "From server" when there is trmnl-server (see "First setup"). On the settings page, in the "Screen" section, the buttons change the screen at once, without a restart, and "Show the text" saves a new text and shows it at once; Home Assistant can select the screen too. The crossed Wi-Fi icon comes only when the device must have a connection and has none; in eco mode and on "From server" Wi-Fi is off on purpose, so there is no icon. The device information (IP, time source, MQTT, battery, Home Assistant state, alerts, time zone, eco mode) is on the settings page, in the "Device" block.
 
-## Режими роботи
+## Modes of operation
 
-Пристрій працює в одному з чотирьох режимів; ще два вмикаються самі, коли сідає батарея. Режим задають екран і перемикач «Економний режим» (на сторінці або в HA).
+The device works in one of four modes; two more come on by themselves when the battery is low. The screen and the "Eco mode" switch (on the page or in Home Assistant) set the mode.
 
-| Режим | Як увімкнути | Wi-Fi і MQTT | Дані й екран | Звук тривог | Сторінка налаштувань |
+| Mode | How to turn it on | Wi-Fi and MQTT | Data and screen | Alert sound | Settings page |
 |---|---|---|---|---|---|
-| **Постійне підключення** | будь-який екран, крім «З сервера» й «Годинника», економний режим вимкнено | увімкнені весь час | HA раз на хвилину, тривоги й прогноз — за своїм розкладом; екран щохвилини; команди HA — одразу | є | завжди |
-| **Економний** | перемикач «Економний режим» | лише під час сеансу раз на 5–240 хв (за замовчуванням 30) | дані й команди HA — під час сеансу; час на екрані — щохвилини | немає (вдома нікого) | під час сеансу, 2 хв після BOOT і поки нею користуються |
-| **Напівавтономний** | екран «З сервера» | лише під час сеансу раз на 1–30 хв (за замовчуванням 5) | картинка `trmnl-server` (без неї — дані HA), команди HA, кімнатні дані й заряд у HA — під час сеансу; дата й час — щохвилини | немає | під час сеансу, 2 хв після BOOT і поки нею користуються |
-| **Автономний** | екран «Годинник» | вимкнені | лише час і кімната (SHTC3), щохвилини | немає | ні; назад — кнопкою KEY |
-| **Мало заряду** (нижче 10 %) | сам | вимкнені | «Годинник»; з живленням USB — повернення на попередній екран | немає | ні |
-| **Екстремальне енергозбереження** (нижче 2 %) | сам | вимкнені | «Дні року» раз на добу, опівночі; батарея — раз на 10 хв | немає | ні |
+| **Always connected** | any screen except "From server" and "Clock", eco mode off | on all the time | Home Assistant once a minute, the alerts and the forecast on their own schedule; the screen each minute; Home Assistant commands at once | yes | always |
+| **Eco** | the "Eco mode" switch | only during a session, every 5–240 min (default 30) | the data and the Home Assistant commands during a session; the time on the screen each minute | no (nobody at home) | during a session, 2 min after BOOT and while somebody uses it |
+| **Semi-offline** | the "From server" screen | only during a session, every 1–30 min (default 5) | the `trmnl-server` image (without it the Home Assistant data), the Home Assistant commands, the room data and the battery to Home Assistant during a session; the date and the time each minute | no | during a session, 2 min after BOOT and while somebody uses it |
+| **Offline** | the "Clock" screen | off | only the time and the room (SHTC3), each minute | no | no; KEY goes back |
+| **Low battery** (below 10 %) | by itself | off | "Clock"; with USB power back to the previous screen | no | no |
+| **Extreme power saving** (below 2 %) | by itself | off | "Days of the year" once a day, at midnight; the battery every 10 min | no | no |
 
-- **Сеанс** (економний і напівавтономний режими): пристрій вмикає Wi-Fi, після підключення — MQTT, бере дані й команди, надсилає свої датчики і знову все вимикає. BOOT коротко — сеанс зараз і Wi-Fi на 2 хв для сторінки. Натискання кнопки під час сеансу перериває очікування: KEY одразу перемикає екран, Wi-Fi підключається далі у фоні.
-- **Сон.** Між сеансами й щохвилинними оновленнями процесор спить (light sleep), екран тримає зображення сам. У режимі постійного підключення на батареї процесор засинає між сигналами Wi-Fi (automatic light sleep). З живленням USB від комп'ютера пристрій не засинає, щоб працював USB (див. «Залізо»).
-- **Перехід між режимами** — кнопкою KEY (наступний екран), на сторінці, у HA (вибір «Екран», перемикач «Економний режим»). В автономний режим зі сторінки — з попередженням, що назад лише кнопками.
-- **Батарея.** Нижче 10 % пристрій сам переходить на «Годинник» і пам'ятає попередній екран (і після перезапуску); з живленням USB — повертається на нього. Нижче 2 % — «Дні року»; з USB — знову на свій екран. Детальніше — у розділі «Годинник (автономний режим)».
+- **Session** (eco and semi-offline modes): the device turns Wi-Fi on, then MQTT after the connection, gets the data and the commands, sends its sensors and turns everything off again. A short BOOT press starts a session now and keeps Wi-Fi on for 2 min for the page. A button press during a session stops the waits: KEY changes the screen at once, Wi-Fi goes on with the connection in the background.
+- **Sleep.** Between the sessions and the updates of each minute the processor sleeps (light sleep); the display keeps its image itself. In the always-connected mode on battery the processor sleeps between the Wi-Fi beacons (automatic light sleep). With USB power from a computer the device does not sleep, so that USB works (see "Hardware").
+- **Mode changes**: KEY (next screen), the page, Home Assistant (the "Screen" select, the "Eco mode" switch). The page asks before it switches to an offline screen: only the buttons switch back.
+- **Battery.** Below 10 % the device switches to "Clock" itself and keeps the previous screen (also after a restart); with USB power it goes back to it. Below 2 %: "Days of the year"; with USB power back to its screen. More in "Clock (offline mode)".
 
-## Збирання й прошивання
+## Build and flash
 
-Потрібен ESP-IDF **v6.1**.
+ESP-IDF **v6.1** is necessary.
 
-1. Відкрийте термінал з ESP-IDF: на Windows — «ESP-IDF PowerShell» (ярлик інсталятора), на Linux і macOS — `. $IDF_PATH/export.sh`.
-2. У теці проекту скопіюйте `sdkconfig.secrets.example` у `sdkconfig.secrets` і впишіть назву та пароль Wi-Fi (необов'язково — MQTT і пароль сторінки). Файл `sdkconfig.secrets` не потрапляє в git.
-3. Один раз створіть ключ підпису прошивки (див. «Підпис прошивки»):
+1. Open a terminal with ESP-IDF: on Windows "ESP-IDF PowerShell" (a shortcut of the installer), on Linux and macOS `. $IDF_PATH/export.sh`.
+2. In the project folder copy `sdkconfig.secrets.example` to `sdkconfig.secrets` and write the Wi-Fi name and password there (optional: MQTT and the page password). `sdkconfig.secrets` does not go to git.
+3. Make the firmware signing key once (see "Firmware signature"):
    ```powershell
    idf.py secure-generate-signing-key --version 2 --scheme rsa3072 rlcd-signing-key.pem
    ```
-   Файл `rlcd-signing-key.pem` у теці проекту не потрапляє в git. Збережіть його копію в надійному місці.
-4. Зберіть і прошийте плату, підключену USB-кабелем (порт `idf.py` знаходить сам):
+   `rlcd-signing-key.pem` in the project folder does not go to git. Keep a copy in a safe place.
+4. Build and flash the board on a USB cable (`idf.py` finds the port itself):
    ```powershell
    idf.py build
    idf.py flash monitor
    ```
-   Вийти з логу — `Ctrl+]`.
+   `Ctrl+]` closes the log.
 
-`idf.py build` також робить архів для оновлення через Wi-Fi: `build/rlcd-dashboard-<версія>.tar` (див. «Оновлення прошивки через Wi-Fi»). Версія — `PROJECT_VER` у `CMakeLists.txt`. Поруч із нею сторінка й Home Assistant показують хеш git-коміту, з якого зібрано прошивку: `0.1.0 (75cd8c4)`, а з незакоміченими змінами — `0.1.0 (75cd8c4-dirty)`. Хеш читається під час кожної збірки (`tools/git-version.cmake`).
+`idf.py build` also makes the archive for the update over Wi-Fi: `build/rlcd-dashboard-<version>.tar` (see "Firmware update over Wi-Fi"). The version is `PROJECT_VER` in `CMakeLists.txt`. Next to it the page and Home Assistant show the git commit of the build: `0.1.0 (75cd8c4)`, with uncommitted changes `0.1.0 (75cd8c4-dirty)`. Each build reads the commit (`tools/git-version.cmake`).
 
-ESP-IDF читає `sdkconfig.defaults` і `sdkconfig.secrets` лише тоді, коли створює новий `sdkconfig`. Якщо змінили `sdkconfig.secrets` після першої збірки, видаліть `sdkconfig` у теці проекту і зберіть знову.
+ESP-IDF reads `sdkconfig.defaults` and `sdkconfig.secrets` only when it makes a new `sdkconfig`. After a change of `sdkconfig.secrets`, delete `sdkconfig` in the project folder and build again.
 
-Якщо плата не прошивається: вимкніть її кнопкою PWR, затисніть BOOT і ввімкніть PWR — плата перейде в режим завантаження.
+If the board does not flash: turn it off with PWR, hold BOOT and turn it on with PWR: the board goes to the download mode.
 
-### Збирання на GitHub
+### Build on GitHub
 
-[.github/workflows/build.yml](.github/workflows/build.yml) збирає прошивку (контейнер `espressif/idf:v6.1`) після кожного push у `master` і для кожного pull request; файли — в артефакті `rlcd-dashboard` запуску (архів для оновлення через Wi-Fi і образи для прошивання через USB). Тег `v*` (наприклад `v0.2.0`) ще й створює реліз з архівом `rlcd-dashboard-<версія>.tar`.
+[.github/workflows/build.yml](.github/workflows/build.yml) builds the firmware (container `espressif/idf:v6.1`) after each push to `main` or `master` and for each pull request; the files are in the `rlcd-dashboard` artifact of the run (the archive for the update over Wi-Fi and the images for USB). A tag `v*` (for example `v0.2.0`) also makes a release with the archive `rlcd-dashboard-<version>.tar`.
 
-Тег також оновлює сайт на GitHub Pages (прошивальник з браузера й архів, див. нижче). Архів — `https://<власник>.github.io/<репозиторій>/rlcd-dashboard.tar` — завжди останній реліз (і поруч архів з версією). Цю адресу лише збірка на GitHub записує в прошивку як адресу оновлення за замовчуванням (`CONFIG_RLCD_OTA_URL`; локальна збірка бере свою з `sdkconfig.secrets`), тож «Перевірити оновлення» на сторінці бачить новий реліз без налаштувань. Один раз увімкніть Pages: Settings → Pages → Source: GitHub Actions, і дозвольте тегам публікувати сайт: Settings → Environments → `github-pages` → Deployment branches and tags → Add deployment branch or tag rule → тип Tag, шаблон `v*` (без цього правила публікація з тегу падає: «Tag "v0.1.0" is not allowed to deploy to github-pages due to environment protection rules»).
+A tag also updates the GitHub Pages site (the web flasher and the archive, see below). The archive `https://<owner>.github.io/<repository>/rlcd-dashboard.tar` is always the last release (with the versioned archive next to it). Only the build on GitHub writes this address into the firmware as the default update address (`CONFIG_RLCD_OTA_URL`; a local build takes its own from `sdkconfig.secrets`), so "Check for an update" on the page sees a new release without settings. Turn Pages on once: Settings → Pages → Source: GitHub Actions, and let tags deploy the site: Settings → Environments → `github-pages` → Deployment branches and tags → Add deployment branch or tag rule → type Tag, pattern `v*` (without this rule the deployment of a tag fails: "Tag "v0.1.0" is not allowed to deploy to github-pages due to environment protection rules").
 
-Підпис: вміст `rlcd-signing-key.pem` покладіть у секрет репозиторію `RLCD_SIGNING_KEY` (Settings → Secrets and variables → Actions). Без секрету (наприклад, у форку) збірка підписує прошивку тимчасовим ключем, і пристрої з вашим ключем її не приймуть — про це пише підсумок запуску.
+Signature: put the content of `rlcd-signing-key.pem` into the repository secret `RLCD_SIGNING_KEY` (Settings → Secrets and variables → Actions). Without the secret (for example in a fork) the build signs the firmware with a temporary key, and devices with your key do not accept it; the run summary tells it.
 
-Номер тегу має збігатися з `PROJECT_VER` у `CMakeLists.txt` (тег `v0.2.0` — версія `0.2.0`): сторінка релізу показує тег, а архів і прошивка — `PROJECT_VER`.
+The tag must be `PROJECT_VER` of `CMakeLists.txt` (tag `v0.2.0` for version `0.2.0`): the release page shows the tag, the archive and the firmware show `PROJECT_VER`.
 
-### Прошивання з браузера
+### Flash from the browser
 
-Сайт на GitHub Pages (`https://<власник>.github.io/<репозиторій>/`) — прошивальник [ESP Web Tools](https://esphome.github.io/esp-web-tools/): Chrome або Edge на комп'ютері прошиває плату через Web Serial, без ESP-IDF. Сайт робить [tools/web-flasher/make_site.py](tools/web-flasher/make_site.py) з кожного тегу: сторінка, `manifest.json` з образами й зміщеннями з `build/flasher_args.json` збірки (завантажувач, таблиця розділів, `ota_data_initial.bin`, прошивка), архів для оновлення через Wi-Fi.
+The GitHub Pages site (`https://<owner>.github.io/<repository>/`) is an [ESP Web Tools](https://esphome.github.io/esp-web-tools/) flasher: Chrome or Edge on a computer flash the board through Web Serial, without ESP-IDF. [tools/web-flasher/make_site.py](tools/web-flasher/make_site.py) makes the site from each tag: the page, `manifest.json` with the images and the offsets from `build/flasher_args.json` of the build (bootloader, partition table, `ota_data_initial.bin`, firmware), and the archive for the update over Wi-Fi.
 
-- Кнопка «Прошити плату» → виберіть порт плати. Плата, що спить, на USB не відповідає: затисніть BOOT, натисніть RESET (або перепідключіть кабель), відпустіть BOOT.
-- Перше прошивання — зі стиранням (сторінка питає), далі точка доступу `RLCD-Setup-…` і майстер першого налаштування.
-- Прошивка з сайту підписана ключем репозиторію (`RLCD_SIGNING_KEY`) і шукає оновлення там само, тож далі пристрій оновлюється через Wi-Fi («Перевірити оновлення»).
+- "Flash the board" → select the port of the board. A sleeping board does not answer on USB: hold BOOT, press RESET (or plug the cable again), release BOOT.
+- The first install erases the device (the page asks), then use the access point `RLCD-Setup-…` and the first-start wizard.
+- The firmware of the site is signed with the key of the repository (`RLCD_SIGNING_KEY`) and looks for updates on the same site, so the device then updates over Wi-Fi ("Check for an update").
 
-## Налаштування
+## Settings
 
-Значення з `sdkconfig.secrets` — лише початкові. Далі все змінюється на **сторінці налаштувань** самого пристрою й зберігається в його пам'яті (NVS): основна й запасна мережа Wi-Fi, DNS, MQTT, пароль сторінки. Після «Зберегти» пристрій перезапускається.
+The values of `sdkconfig.secrets` are only the start values. Then the **settings page** of the device changes everything and keeps it in its memory (NVS): the main and the backup Wi-Fi network, DNS, MQTT, the page password. After "Save" the device restarts.
 
-Як відкрити сторінку:
-- **Через точку доступу пристрою.** Вона вмикається сама, якщо жодна мережа не підключилася, або вручну кнопкою BOOT (затиснути на 3 с). На екрані з'являються назва мережі `RLCD-xxxx`, пароль, адреса `http://10.0.0.1` і QR-код: відскануйте його телефоном, і телефон підключиться сам. Сторінка відкривається сама (captive portal) або за адресою `http://10.0.0.1`. Через точку доступу пароль сторінки не потрібен.
-- **З домашньої мережі** за іменем `http://rlcd.local` (mDNS, див. нижче) або за IP-адресою пристрою (видно на сторінці й у HA), наприклад `http://192.168.1.50`. Поки пароль сторінки не задано, вона відкривається без пароля. Якщо задати пароль, сторінка питатиме користувача `admin` і цей пароль.
+How to open the page:
+- **Through the access point of the device.** It comes on by itself when no network connects, or with the BOOT button (hold 3 s). The screen shows the network name `RLCD-xxxx`, the password, the address `http://10.0.0.1` and a QR code: scan it with a phone, and the phone connects itself. The page opens by itself (captive portal) or at `http://10.0.0.1`. Through the access point the page password is never necessary.
+- **From the home network** at `http://rlcd.local` (mDNS, see below) or at the IP address of the device (on the page and in Home Assistant), for example `http://192.168.1.50`. Without a page password the page opens without one. With a password the page asks for the user `admin` and that password.
 
-**mDNS.** Пристрій сам анонсує себе як `<ім'я>.local`, де ім'я — перша частина поля «Ім'я пристрою в мережі» (типово `rlcd.local`, тож `rlcd.local`; з `rlcd.lan` — теж `rlcd.local`). Його знаходять без локального DNS: Windows 10 і новіші, macOS, iOS, Linux з Avahi, Android 12 і новіші. Сторінку налаштувань пристрій анонсує як сервіс `_http._tcp` (з сертифікатом — ще й `_https._tcp`) з версією прошивки в TXT. mDNS працює і в мережі дому, і в точці доступу; в економному режимі й на «З сервера» — лише під час сеансу звʼязку, бо між сеансами Wi-Fi вимкнено. Ім'я видно в блоці «Пристрій»: «Ім'я в мережі: rlcd.local (mDNS)».
+**mDNS.** The device announces itself as `<name>.local`, where the name is the first part of the field "Device name in the network" (default `rlcd.local`, so `rlcd.local`; with `rlcd.lan` also `rlcd.local`). Computers and phones find it without a local DNS: Windows 10 and later, macOS, iOS, Linux with Avahi, Android 12 and later. The device announces the settings page as an `_http._tcp` service (with a certificate also `_https._tcp`), with the firmware version in the TXT record. mDNS works on the home network and in the access point; in eco mode and on "From server" only during a session, because Wi-Fi is off between the sessions. The "Device" block shows the name: "Network name: rlcd.local (mDNS)".
 
-Порядок підключення: основна мережа (~20 с) → запасна (~20 с) → ще раз → точка доступу. Поки точка доступу ввімкнена й до неї ніхто не підключений, пристрій раз на 5 хв знову пробує мережі. Коли пристрій підключений, а точкою доступу ніхто не користується 10 хв, вона вимикається.
+Connection order: the main network (~20 s) → the backup network (~20 s) → again → the access point. While the access point is on and nobody is connected to it, the device tries the networks again every 5 min. When the device is connected and nobody uses the access point for 10 min, it goes off.
 
-**Кнопки**
+**Buttons**
 
-| Кнопка | Дія |
+| Button | Action |
 |---|---|
-| KEY | Наступний екран (в економному режимі — без увімкнення Wi-Fi) |
-| BOOT, коротко | Оновити екран (в економному режимі — і лишити Wi-Fi на 2 хв) |
-| BOOT, 3–10 с | Увімкнути точку доступу для налаштування |
-| BOOT, 10 с і довше | Стерти налаштування (діють значення з `sdkconfig.secrets`) і перезапустити |
+| KEY | Next screen (in eco mode without Wi-Fi) |
+| BOOT, short | Update the screen (in eco mode also keep Wi-Fi on for 2 min) |
+| BOOT, 3–10 s | Turn on the access point for the setup |
+| BOOT, 10 s and longer | Erase the settings (the values of `sdkconfig.secrets` apply) and restart |
 
-**Параметри збірки** (`idf.py menuconfig` → «RLCD dashboard»)
+**Build settings** (`idf.py menuconfig` → "RLCD dashboard")
 
-| Параметр | За замовчуванням | Опис |
+| Setting | Default | Description |
 |---|---|---|
-| `RLCD_WIFI_SSID`, `RLCD_WIFI_PASSWORD` | порожньо | Основна мережа Wi-Fi (початкове значення) |
-| `RLCD_WIFI2_SSID`, `RLCD_WIFI2_PASSWORD` | порожньо | Запасна мережа |
-| `RLCD_DNS1`, `RLCD_DNS2` | порожньо | DNS-сервери замість тих, що дає роутер |
-| `RLCD_MQTT_URI`, `RLCD_MQTT_USER`, `RLCD_MQTT_PASSWORD` | порожньо | Брокер MQTT, наприклад `mqtt://homeassistant.local:1883` |
-| `RLCD_MQTT_PREFIX` | `homeassistant` | Префікс MQTT discovery |
-| `RLCD_WEB_PASSWORD` | порожньо | Пароль сторінки налаштувань у домашній мережі (порожньо — без пароля) |
-| `RLCD_AP_IP` | `10.0.0.1` | Адреса пристрою в його точці доступу (мережа /24) |
-| `RLCD_TZ` | `EET-2EEST,M3.5.0/3,M10.5.0/4` | Часовий пояс (Київ), поки немає даних від Home Assistant (див. «Літній час») |
-| `RLCD_LANGUAGE` | `uk` | Мова екрана, сторінки й сутностей HA: `uk` або `en` (див. «Мови й тексти»); далі — на сторінці |
-| `RLCD_METEO_STATION` | порожньо | Станція прогнозу meteo.gov.ua (`33345` — Київ); далі — список міст на сторінці й у HA |
-| `RLCD_HOST` | `rlcd.local` | Ім'я пристрою: перша частина — DHCP і mDNS (`rlcd.local`), повне — ім'я сертифіката HTTPS; далі — на сторінці |
-| `RLCD_SERVER_URL` | порожньо | Картинка екрана «З сервера» (`http://сервер:15000/quad.bmp`); далі — на сторінці |
-| `RLCD_OTA_URL` | порожньо (на GitHub — адреса Pages) | Архів прошивки для «Перевірити оновлення»; сторінка пам'ятає останню використану адресу |
-| `RLCD_ALERT_REGION` | порожньо | Область тривог ubilling.net.ua, як у відповіді API (`м. Київ`, `Київська область`); далі — список на сторінці й у HA |
-| `RLCD_NTP_SERVER` | `pool.ntp.org` | Сервер точного часу |
-| `RLCD_ROOM_TEMP_OFFSET_X10` | `0` | Поправка до температури SHTC3, десяті частки °C (плата трохи гріється) |
-| `RLCD_VBUS_SENSE_GPIO` | `-1` | Вивід із дільником від VBUS для точного визначення USB (див. «Живлення») |
+| `RLCD_WIFI_SSID`, `RLCD_WIFI_PASSWORD` | empty | Main Wi-Fi network (start value) |
+| `RLCD_WIFI2_SSID`, `RLCD_WIFI2_PASSWORD` | empty | Backup network |
+| `RLCD_DNS1`, `RLCD_DNS2` | empty | DNS servers instead of the ones of the router |
+| `RLCD_MQTT_URI`, `RLCD_MQTT_USER`, `RLCD_MQTT_PASSWORD` | empty | MQTT broker, for example `mqtt://homeassistant.local:1883` |
+| `RLCD_MQTT_PREFIX` | `homeassistant` | MQTT discovery prefix |
+| `RLCD_WEB_PASSWORD` | empty | Settings page password on the home network (empty: no password) |
+| `RLCD_AP_IP` | `10.0.0.1` | Address of the device in its access point (network /24) |
+| `RLCD_TZ` | `EET-2EEST,M3.5.0/3,M10.5.0/4` | Time zone (Kyiv) until Home Assistant gives one (see "Daylight saving time") |
+| `RLCD_LANGUAGE` | `uk` | Language of the screen, the page and the Home Assistant entities: `uk` or `en` (see "Languages and texts"); then on the page |
+| `RLCD_METEO_STATION` | empty | meteo.gov.ua forecast station (`33345` is Kyiv); then a list of cities on the page and in Home Assistant |
+| `RLCD_HOST` | `rlcd.local` | Device name: the first part is for DHCP and mDNS (`rlcd.local`), the full name is the name of the HTTPS certificate; then on the page |
+| `RLCD_SERVER_URL` | empty | Image of the "From server" screen (`http://server:15000/quad.bmp`); then on the page |
+| `RLCD_OTA_URL` | empty (on GitHub: the Pages address) | Firmware archive for "Check for an update"; the page keeps the last address |
+| `RLCD_ALERT_REGION` | empty | ubilling.net.ua alert region, as in the API answer (`м. Київ`, `Київська область`); then a list on the page and in Home Assistant |
+| `RLCD_NTP_SERVER` | `pool.ntp.org` | Time server |
+| `RLCD_ROOM_TEMP_OFFSET_X10` | `0` | Correction of the SHTC3 temperature, tenths of °C (the board is a little warm) |
+| `RLCD_VBUS_SENSE_GPIO` | `-1` | Pin with a divider from VBUS for an exact USB detection (see "Power") |
 
-## Перше налаштування
+## First setup
 
-Після першого запуску (і після скидання BOOT 10 с) сторінка налаштувань спершу показує майстер: мова, Wi-Fi, чи є Home Assistant (адреса й токен) і trmnl-server (адреса картинки), місто прогнозу й область тривог. «Зберегти й перезапустити» записує відповіді; посилання «Усі налаштування» відкриває повну сторінку без майстра.
+After the first start (and after a reset with BOOT 10 s) the settings page first shows a wizard: the language, Wi-Fi, whether there is Home Assistant (address and token) and trmnl-server (image address), the forecast city and the alert region. "Save and restart" keeps the answers; the "All settings" link opens the full page without the wizard.
 
-- Без Home Assistant екрани «Дашборд» і «4 квадрати» недоступні: погода, повітря й світло беруться з нього. Їх немає в колі KEY, на сторінці й у списку екранів HA; збережений екран, якого немає, змінюється на «Кімната».
-- Без trmnl-server недоступний екран «З сервера».
-- Відповіді можна змінити потім: прапорці «Є Home Assistant» і «Є trmnl-server» у відповідних розділах сторінки.
-- Пристрій, налаштований до появи майстра (є мережа Wi-Fi), майстра не показує: відповіді беруться з налаштувань (є адреса HA — є HA; є адреса картинки — є trmnl-server).
+- Without Home Assistant the "Dashboard" and "4 quadrants" screens are not available: the weather, the air and the power come from it. They are not in the KEY cycle, on the page or in the Home Assistant screen list; a kept screen that is not available changes to "Room".
+- Without trmnl-server the "From server" screen is not available.
+- Change the answers later with the checkboxes "I have Home Assistant" and "I have trmnl-server" in their sections of the page.
+- A device that had settings before the wizard (a Wi-Fi network is set) does not show the wizard: the answers come from its settings (an HA address means Home Assistant, an image address means trmnl-server).
 
-## Дані з Home Assistant
+## Data from Home Assistant
 
-Пристрій сам читає HA через REST API з довгостроковим токеном (Профіль → Безпека → Довгострокові токени). Адресу, токен і сутності задають у майстрі першого налаштування й на сторінці налаштувань або в `sdkconfig.secrets` (приклади — у `sdkconfig.secrets.example`). У `sdkconfig.defaults` значень домашньої мережі немає.
+The device reads Home Assistant through the REST API with a long-lived access token (Profile → Security → Long-lived access tokens). Set the address, the token and the entities in the first-start wizard and on the settings page, or in `sdkconfig.secrets` (examples in `sdkconfig.secrets.example`).
 
-- Раз на хвилину — один запит `POST /api/template`: шаблон повертає стан, час зміни й одиницю всіх сутностей разом.
-- Значення 24-годинної давності для зміни за добу — з `/api/history/period`, по одній сутності за хвилину; кожне значення оновлюється раз на 15 хв.
-- Прогноз на завтра — з інформера meteo.gov.ua для вибраного міста, раз на годину. Місто вибирають зі списку обласних центрів на сторінці (розділ «Прогноз погоди», діє одразу) або в HA (вибір «Прогноз: місто»). Донецька й Луганська в списку немає: meteo.gov.ua не оновлює їхні прогнози. З англійською мовою опис прогнозу теж англійською (англійський інформер).
-- Погода зараз — теж з інформера meteo.gov.ua (блок поточної погоди: температура, вологість, час спостереження), коли HA не дає температури чи вологості надворі: сутності не задано або вона не відповідає. Тоді інформер читається раз на 30 хв; спостереження, старші за 3 год, не показуються; зміни за добу немає. На сторінці: «Погода зараз: meteo.gov.ua, +5°, 78 %, спостереження о 14:50».
-- Тривоги — із сутностей HA (дронова й ракетна); якщо їх немає, — з ubilling.net.ua (див. «Тривоги без Home Assistant»).
-- Без Home Assistant екрани показують те, що дають інші джерела (поточна погода й прогноз meteo.gov.ua, тривоги ubilling.net.ua): кожне джерело саме перевіряє вік своїх даних.
-- Логіка така сама, як у `trmnl-server`: основна сутність, а якщо вона недоступна чи застаріла (понад 30 хв), — запасна; ДБЖ «OL/OB» або напруга; графік Svitlo.live; текст тривоги з часом початку.
-- Дані, старші за 5 хв, на екрані не показуються («н/д», «Немає даних про тривогу»).
+- Once a minute one `POST /api/template` request: the template returns the state, the change time and the unit of all entities together.
+- The values of 24 hours ago for the 24-hour change come from `/api/history/period`, one entity a minute; each value is read again every 15 min.
+- Tomorrow's forecast comes from the meteo.gov.ua informer for the selected city, once an hour. Select the city from the list of the regional centres on the page ("Weather forecast" section, applies at once) or in Home Assistant (the "Forecast: city" select). Donetsk and Luhansk are not in the list: meteo.gov.ua does not update their forecasts. With English the forecast text is English too (the English informer).
+- The current weather also comes from the meteo.gov.ua informer (its current weather block: temperature, humidity, observation time) when Home Assistant gives no outdoor temperature or humidity: no entity, or it does not answer. Then the device reads the informer every 30 min; observations older than 3 h are not shown; there is no 24-hour change. On the page: "Weather now: meteo.gov.ua, +5°, 78 %, observation at 14:50".
+- Alerts come from the Home Assistant entities (drone and missile); without them from ubilling.net.ua (see "Alerts without Home Assistant").
+- Without Home Assistant the screens show what the other sources give (current weather and forecast of meteo.gov.ua, alerts of ubilling.net.ua): each source checks the age of its own data.
+- The logic is the same as in `trmnl-server`: the main entity, or a backup one when it is not available or older than 30 min; the UPS state "OL/OB" or its voltage; the Svitlo.live outage schedule; the alert text with its start time.
+- Data older than 5 min is not shown ("n/a", "No alert data").
 
-**Світло: три стани.** Екран показує одне з трьох: «Світло від ДТЕК», «Світло від генератора», «Світла немає».
+**Power: three states.** The screen shows one of three: "Grid power", "Generator power", "No power". DTEK is the grid operator of Kyiv.
 
-- ДБЖ працює від батареї («OB» або низька вхідна напруга) — світла немає.
-- Є світло від ДТЕК — від ДТЕК.
-- ДБЖ має вхідне живлення, а світла від ДТЕК немає — від генератора.
-- ДБЖ не відповідає (наприклад, розрядився) і світла від ДТЕК немає — світла немає.
+- The UPS works from its battery ("OB" or a low input voltage): no power.
+- There is grid power: grid.
+- The UPS has input power and there is no grid power: generator.
+- The UPS does not answer (for example, its battery is empty) and there is no grid power: no power.
 
-«н/д» для світла немає.
+There is no "n/a" for the power.
 
-**Світло від ДТЕК** пристрій бере з першого джерела, яке його знає (розділ «Світло від ДТЕК» на сторінці налаштувань):
+**Grid power** comes from the first source that knows it ("Grid power" section of the settings page):
 
-1. Сутність HA зі станом `on/off`.
-2. Перевірка healthchecks.io (як у `trmnl-server`): ключ API лише для читання (Project Settings → API Access) і перевірка (slug, UUID або unique_key). `up` — світло від ДТЕК є, `grace` (пінг запізнюється) і `down` — немає. Раз на 5 хв: HTTPS-запит дорожчий для батареї.
-3. Пінг пристрою в домашній мережі без резервного живлення (IP чи ім'я) — лише коли перші два нічого не кажуть. Відповідає — світло від ДТЕК є; не відповідає (або такої адреси немає) — немає. 3 пінги, достатньо однієї відповіді; раз на хвилину, в економному режимі — під час оновлення.
+1. A Home Assistant entity with the state `on/off`.
+2. A healthchecks.io check (as in `trmnl-server`): a read-only API key (Project Settings → API Access) and the check (slug, UUID or unique_key). `up` means grid power, `grace` (the ping is late) and `down` mean no grid power. Every 5 min: an HTTPS request costs more battery.
+3. A ping of a device on the home network without backup power (IP or name), only when the first two tell nothing. It answers: grid power; no answer (or no such address): no grid power. 3 pings, one answer is enough; once a minute, in eco mode during the update.
 
-Якщо жодне джерело нічого не каже, світла від ДТЕК немає.
+When no source tells anything, there is no grid power.
 
-Що саме прочитав пристрій, видно в блоці «Пристрій» на сторінці налаштувань.
+The "Device" block of the settings page shows what the device read.
 
-**Літній час.** Зсув від UTC і дату переходу на літній чи зимовий час дає Home Assistant: окремий запит `POST /api/template` повертає поточний зсув, час наступної зміни (до 400 днів наперед) і новий зсув. Тому в HA має бути правильний часовий пояс (Налаштування → Система → Загальні, для Києва `Europe/Kyiv`).
+**Daylight saving time.** Home Assistant gives the UTC offset and the date of the change to summer or winter time: a separate `POST /api/template` request returns the offset now, the time of the next change (up to 400 days ahead) and the new offset. So Home Assistant must have the correct time zone (Settings → System → General; for Kyiv `Europe/Kyiv`).
 
-- Пристрій зберігає відповідь у пам'яті (NVS) і в момент переходу сам міняє зсув — і без Wi-Fi (на «Годиннику» теж).
-- HA питає не щохвилини, а коли треба: після першого запуску (відповіді ще немає), раз на квартал (90 днів), за тиждень до переходу (якщо дати змінили, пристрій це побачить) і після переходу (дізнатися наступний). Без відповіді — знову через годину.
-- В економному режимі й на екрані «З сервера» запит іде під час сеансу звʼязку; сеанс чекає на відповідь до 5 с.
-- Поки від HA нічого немає, діють правила прошивки (`CONFIG_RLCD_TZ`).
-- Стан — у блоці «Пристрій»: «Часовий пояс: UTC+2:00 (з Home Assistant), перехід на UTC+3:00 ДД.ММ.РРРР о ГГ:ХХ» або «правила прошивки…».
+- The device keeps the answer in its memory (NVS) and changes the offset itself at the time of the change, also without Wi-Fi (on "Clock" too).
+- It does not ask each minute, only when necessary: after the first start (no answer yet), every quarter (90 days), a week before the change (to see changed dates) and after the change (to learn the next one). Without an answer it asks again in an hour.
+- In eco mode and on "From server" the request goes during a session; the session waits up to 5 s for the answer.
+- Until Home Assistant answers, the firmware rules apply (`CONFIG_RLCD_TZ`).
+- The "Device" block shows it: "Time zone: UTC+2:00 (from Home Assistant), change to UTC+3:00 DD.MM.YYYY at HH:MM" or "firmware rules…".
 
-## Тривоги без Home Assistant (ubilling.net.ua)
+## Alerts without Home Assistant (ubilling.net.ua)
 
-Якщо поля сутностей тривог (дронова й ракетна) порожні — немає HA або в HA немає інтеграції тривог, — пристрій бере тривоги з [API повітряних тривог Ubilling](https://wiki.ubilling.net.ua/doku.php?id=aerialalertsapi): `GET https://ubilling.net.ua/aerialalerts/?source=klimenko&raw`, без ключа.
+When the alert entity fields (drone and missile) are empty (no Home Assistant, or no alert integration in it), the device takes the alerts from the [Ubilling air raid alert API](https://wiki.ubilling.net.ua/doku.php?id=aerialalertsapi): `GET https://ubilling.net.ua/aerialalerts/?source=klimenko&raw`, without a key.
 
-- Область вибирають на сторінці (розділ «Тривоги без Home Assistant», діє одразу), у майстрі першого налаштування або в HA (вибір «Тривоги: область»). У списку — м. Київ, області, АР Крим і Севастополь.
-- Рівні тривоги, як у сутностей HA: червоний — «Ракетна тривога», жовтий — «Дронова тривога»; тривога без рівня — червона. Час початку — з поля `enabled_at`.
-- Запит раз на хвилину (в економному режимі — під час оновлення); API дозволяє до 2 запитів на секунду. Дані, старші за 5 хв, не показуються («Немає даних про тривогу»).
-- Тривоги лише на рівні області: окремі райони в цьому джерелі є, але пристрій їх не дивиться.
-- Стан — у блоці «Пристрій»: «Тривоги: ubilling.net.ua, «м. Київ», дані о ГГ:ХХ».
+- Select the region on the page ("Alerts without Home Assistant" section, applies at once), in the first-start wizard or in Home Assistant (the "Alerts: region" select). The list has Kyiv city, the oblasts, Crimea and Sevastopol.
+- The alert levels are the same as for the Home Assistant entities: red is "Missile alert", yellow is "Drone alert"; an alert without a level counts as red. The start time comes from the `enabled_at` field.
+- One request a minute (in eco mode during the update); the API allows up to 2 requests a second. Data older than 5 min is not shown ("No alert data").
+- Only oblast-level alerts: the source has the districts too, but the device does not read them.
+- The "Device" block shows the state: "Alerts: ubilling.net.ua, «Kyiv city», data at HH:MM".
 
 ## Home Assistant (MQTT)
 
-Якщо задано брокер, пристрій сам створює в HA пристрій «RLCD Dashboard» (MQTT discovery) з сутностями:
+With a broker in the settings, the device makes the "RLCD Dashboard" device in Home Assistant (MQTT discovery) with these entities:
 
-| Сутність | Опис |
+| Entity | Description |
 |---|---|
-| Температура в кімнаті, Вологість у кімнаті | SHTC3 |
-| Батарея | % |
-| Напруга батареї, Сигнал Wi-Fi | діагностика |
-| Живлення USB | двійковий датчик |
-| Сеанс синхронізації | час останнього підключення до MQTT. В економному режимі й на екрані «З сервера» кожен сеанс — нове підключення, тому в «Активності» HA видно кожен сеанс; у звичайному режимі значення міняється лише після перепідключення |
-| Економний режим | перемикач (див. «Економний режим») |
-| Оновлення в економному режимі | число, хв (5–240, за замовчуванням 30) |
-| Звук тривоги | перемикач (див. «Звук») |
-| Гучність | число, % (0–100) |
-| Екран | вибір: Дашборд, Кімната, Текст, 4 квадрати, З сервера, Годинник — лише доступні екрани (див. «Перше налаштування»), назви мовою пристрою. У звичайному режимі екран змінюється одразу, в економному й на екрані «З сервера» — під час найближчого сеансу звʼязку; «Годинник» команд не чує (звʼязку немає) — назад його перемикає KEY. Зміна кнопкою KEY чи на сторінці теж іде в HA |
-| Оновлення екрана «З сервера» | число, хв (1–30, за замовчуванням 5): як часто екран «З сервера» вмикає звʼязок |
-| Прогноз: місто | вибір: «Без прогнозу» і обласні центри; діє одразу (в економному режимі — під час сеансу) |
-| Тривоги: область | вибір: «Не вибрано», м. Київ, області; для тривог з ubilling.net.ua, коли в налаштуваннях немає сутностей тривог |
+| Room temperature, Room humidity | SHTC3 |
+| Battery | % |
+| Battery voltage, Wi-Fi signal | diagnostics |
+| USB power | binary sensor |
+| Sync session | the time of the last MQTT connection. In eco mode and on "From server" each session is a new connection, so the Home Assistant activity shows each session; in the normal mode the value changes only after a new connection |
+| Eco mode | switch (see "Eco mode") |
+| Update in eco mode | number, min (5–240, default 30) |
+| Alert sound | switch (see "Sound") |
+| Volume | number, % (0–100) |
+| Screen | select: Dashboard, Room, Note, 4 quadrants, From server, Clock; only the available screens (see "First setup"), names in the language of the device. In the normal mode the screen changes at once, in eco mode and on "From server" at the next session; "Clock" does not hear commands (no connection), KEY switches it back. A change with KEY or on the page goes to Home Assistant too |
+| Update of the «From server» screen | number, min (1–30, default 5): how often the "From server" screen turns the connection on |
+| Forecast: city | select: "No forecast" and the regional centres; applies at once (in eco mode at the session) |
+| Alerts: region | select: "Not set", Kyiv city, the oblasts; for the alerts of ubilling.net.ua when the settings have no alert entities |
 
-Теми: `rlcd/rlcd_xxxxxx/state` (JSON, раз на хвилину), `rlcd/rlcd_xxxxxx/status` (`online`/`offline`), `rlcd/rlcd_xxxxxx/eco[/set]`, `rlcd/rlcd_xxxxxx/eco_min[/set]`. На сторінці пристрою в HA є посилання на сторінку налаштувань.
+Topics: `rlcd/rlcd_xxxxxx/state` (JSON, once a minute), `rlcd/rlcd_xxxxxx/status` (`online`/`offline`), `rlcd/rlcd_xxxxxx/eco[/set]`, `rlcd/rlcd_xxxxxx/eco_min[/set]`. The device page in Home Assistant has a link to the settings page.
 
-## Звук
+## Sound
 
-Динамік 8 Ом / 2 Вт — у роз'ємі SPK; звук іде через кодек ES8311 і підсилювач NS4150B. Кодек і підсилювач увімкнені лише на час звучання: після запуску прошивка одразу переводить ES8311 у режим вимкнення (до першого звуку), а ES7210 (мікрофони, прошивка їх не використовує) — у power-down, щоб вони не брали струм і уві сні.
+An 8 Ω / 2 W speaker goes to the SPK connector; the sound goes through the ES8311 codec and the NS4150B amplifier. The codec and the amplifier are on only while a sound plays: after the start the firmware puts ES8311 into power-down at once (until the first sound), and ES7210 (the microphones; the firmware does not use them) into power-down, so that they take no current, also in sleep.
 
-- Окремий звук для трьох подій: початок ракетної тривоги, початок дронової тривоги, відбій (усі тривоги закінчились). Якщо одночасно починаються обидві, звучить звук ракетної.
-- Вбудовані звуки: «Сирена» (~4 с, тон угору-вниз), «Тривожний сигнал» (два тони швидко змінюються, ~3 с), «Короткі сигнали» (5 «піп»), «Мелодія відбою» (три спокійні тони вниз), «Без звуку». Типово: ракетна — сирена, дронова — тривожний сигнал, відбій — мелодія.
-- **Свої звуки:** на сторінці налаштувань («Звук тривоги» → «Свої звуки») для кожної події можна завантажити файл WAV і вибрати для події «Свій файл». Файл зберігається на самому пристрої (розділ флешу `sounds`, по 2 МБ на подію) і не зникає після оновлення прошивки.
-  - Формат: WAV без стиснення (PCM), 8 чи 16 біт, моно чи стерео, 8000–48000 Гц. Пристрій зберігає моно 16 біт: до ~63 с при 16000 Гц, до ~23 с при 44100 Гц; грає не довше 60 с.
-  - MP3 чи OGG спершу перетворіть, наприклад: `ffmpeg -i siren.mp3 -ac 1 -ar 22050 -sample_fmt s16 siren.wav`.
-- Усе це, вимикач звуку й гучність змінюються на сторінці одразу, без перезапуску. Вимикач і гучність є й у HA (перемикач «Звук тривоги», число «Гучність»). Кнопки «Перевірити» спершу зберігають гучність і звуки з форми, потім програють звук події.
-- Перший стан після запуску звуку не дає (щоб не лунало після перезапуску під час тривоги); застарілі дані (понад 5 хв) — теж.
-- В економному режимі звуку немає: вдома нікого.
+- A separate sound for three events: the start of a missile alert, the start of a drone alert, the all clear (all alerts ended). When both start together, the missile sound plays.
+- Built-in sounds: "Siren" (~4 s, the tone goes up and down), "Warning tone" (two fast alternating tones, ~3 s), "Short beeps" (5 beeps), "All-clear melody" (three calm falling tones), "No sound". Defaults: missile siren, drone warning tone, all-clear melody.
+- **Own sounds:** on the settings page ("Alert sound" → "Own sounds") upload a WAV file for each event and select "Own file" for the event. The file stays on the device (the `sounds` flash partition, 2 MB per event) and stays after a firmware update.
+  - Format: WAV without compression (PCM), 8 or 16 bit, mono or stereo, 8000–48000 Hz. The device keeps mono 16 bit: up to ~63 s at 16000 Hz, up to ~23 s at 44100 Hz; it plays up to 60 s.
+  - Convert MP3 or OGG first, for example: `ffmpeg -i siren.mp3 -ac 1 -ar 22050 -sample_fmt s16 siren.wav`.
+- All of this, the sound switch and the volume change on the page at once, without a restart. Home Assistant has the switch and the volume too ("Alert sound" switch, "Volume" number). The "Play" buttons first save the volume and the sounds of the form, then play the sound of the event.
+- The first state after the start gives no sound (so that nothing sounds after a restart during an alert); old data (more than 5 min) gives none either.
+- Eco mode has no sound: nobody is at home.
 
-## Економний режим
+## Eco mode
 
-Вмикається на сторінці налаштувань (розділ «Економний режим», діє одразу) або з Home Assistant перемикачем «Економний режим» (наприклад, тією самою автоматизацією «нікого немає вдома», що вимикає інші пристрої). MQTT для нього не обов'язковий.
+Turn it on on the settings page ("Eco mode" section, applies at once) or from Home Assistant with the "Eco mode" switch (for example, with the "nobody at home" automation that turns other devices off). MQTT is not necessary for it.
 
-- Пристрій прокидається раз на N хв (5–240): вмикає Wi-Fi, забирає дані з HA, оновлює екран, публікує датчики, отримує команди — і знову вимикає Wi-Fi та MQTT і засинає (light sleep). Екран RLCD тримає зображення сам: виводи панелі лишаються під керуванням і під час сну.
-- HA зберігає команду на брокері (retained), тож пристрій, що спить, побачить її під час найближчого пробудження — не пізніше ніж за N хв. Зміна на сторінці теж записується в цю команду, тож HA не поверне старе значення.
-- MQTT від'єднується коректно, тому сутності в HA лишаються доступними, поки пристрій спить.
-- MQTT стартує після підключення Wi-Fi: перша спроба без мережі відкладає наступну на 10 с, і сеанс закінчувався раніше, ніж MQTT підключався.
-- Без Wi-Fi (наприклад, роутер без світла) точка доступу сама не вмикається: пристрій засне до наступного разу, щоб не сідала батарея.
-- KEY одразу показує наступний екран з останніми даними, не вмикаючи Wi-Fi. BOOT коротко — оновити дані зараз і лишити Wi-Fi на 2 хв, щоб відкрити сторінку налаштувань. Поки сторінкою користуються, пристрій не засинає. BOOT 3 с — точка доступу; поки вона ввімкнена, пристрій не спить.
-- Поки триває перевірка нової прошивки після OTA (90 с), пристрій не засинає.
-- Якщо USB підключено до комп'ютера, пристрій не засинає глибоко, щоб працював лог, але Wi-Fi між оновленнями все одно вимкнений.
+- The device wakes up every N min (5–240): it turns Wi-Fi on, gets the Home Assistant data, updates the screen, publishes its sensors, gets the commands, then turns Wi-Fi and MQTT off and sleeps (light sleep). The RLCD keeps its image itself: the display pins stay driven also during sleep.
+- Home Assistant keeps the command on the broker (retained), so a sleeping device sees it at the next wake-up, at most N min later. A change on the page is written to this command too, so Home Assistant does not set the old value back.
+- MQTT disconnects cleanly, so the entities stay available in Home Assistant while the device sleeps.
+- MQTT starts after the Wi-Fi connection: a first try without a network puts the next one 10 s later, and the session would end before MQTT connects.
+- Without Wi-Fi (for example, a router without power) the access point does not come on by itself: the device sleeps until the next time, to save the battery.
+- KEY shows the next screen with the last data at once, without Wi-Fi. A short BOOT press updates the data now and keeps Wi-Fi on for 2 min to open the settings page. While somebody uses the page, the device does not sleep. BOOT 3 s: the access point; while it is on, the device does not sleep.
+- During the check of a new firmware after an update (90 s) the device does not sleep.
+- With USB to a computer the device does not sleep deeply, so that the log works, but Wi-Fi is still off between the updates.
 
-Найбільше енергії при цьому споживає перетворювач 3,3 В на платі (~60 мВт); Wi-Fi і процесор між оновленнями майже нічого не беруть.
+The 3.3 V converter of the board takes the most energy (~60 mW); Wi-Fi and the processor take almost nothing between the updates.
 
-## Екран з сервера
+## The server screen
 
-Екран «З сервера» — у колі KEY після «4 квадратів» і кнопкою на сторінці налаштувань. Це напівавтономний режим: зв'язок лише раз на 5 хв (інтервал 1–30 хв — на сторінці в розділі «Економний режим» і в HA, «Оновлення екрана «З сервера»»).
+The "From server" screen is in the KEY cycle after "4 quadrants" and a button on the settings page. It is the semi-offline mode: a connection only every 5 min (the interval of 1–30 min is on the page in the "Eco mode" section and in Home Assistant, "Update of the «From server» screen").
 
-- Картинку дає `trmnl-server`: `GET http://сервер:15000/quad.bmp` (поле «Картинка trmnl-server» на сторінці), BMP 400 × 300, 1 біт. У ній погода й AQI, тривога і світло — так само, як на екрані «4 квадрати»; верхній лівий квадрат порожній.
-- Між сеансами Wi-Fi і MQTT вимкнені, пристрій спить (light sleep) і щохвилини малює у верхньому лівому квадраті дату й час. Позначка «ЕКО» видна лише першу хвилину після переходу в цей режим (так само в економному режимі); значка Wi-Fi немає, бо Wi-Fi вимкнено навмисно.
-- Раз на 5 хв (або за заданим інтервалом) пристрій вмикає Wi-Fi і MQTT: бере картинку (і бачить, чи вона змінилась), отримує команди з HA — серед них і вибір екрана, — надсилає температуру й вологість у кімнаті та заряд і знову вимикає зв'язок. BOOT коротко — сеанс зараз, Wi-Fi на 2 хв, щоб відкрити сторінку, і 30 с без сну для USB; поки сторінкою користуються, Wi-Fi не вимикається (перевірка `/ping` відкритої сторінки його не тримає).
-- Home Assistant, healthchecks.io, meteo.gov.ua і пінг пристрій сам не запитує: дані дає сервер. Звуку тривог на цьому екрані немає.
-- Без сервера пристрій працює з тим, що є. Якщо `trmnl-server` не відповідає (пристрій пробує тричі з паузою 2 с), у тому ж сеансі пристрій бере дані з HA і, коли картинка старша за 15 хв, малює квадрати сам (угорі праворуч «дані HA»). Якщо немає ні картинки, ні свіжих даних (немає Wi-Fi), показує останню картинку з написом «дані о ГГ:ХХ» і пробує знову через 5 хв. Годинник і кімнатні дані йдуть завжди.
-- Стан останнього запиту — на сторінці налаштувань («Картинка trmnl-server: нова / без змін / помилка о ГГ:ХХ»); після вдалого запиту там же видно останню помилку з її часом.
-- Перевірити картинку в браузері: `http://сервер:15000/quad.bmp`; зразки без Home Assistant — `/dev/preview?layout=quad&sample=missile` у trmnl-server, запущеному в режимі Development.
+- `trmnl-server` gives the image: `GET http://server:15000/quad.bmp` (the "trmnl-server image" field on the page), BMP 400 × 300, 1 bit. It has the weather and AQI, the alert and the power, as on the "4 quadrants" screen; the top left quadrant is empty.
+- Between the sessions Wi-Fi and MQTT are off, the device sleeps (light sleep) and draws the date and the time in the top left quadrant each minute. "ECO" shows only in the first minute after the switch to this mode (as in eco mode); there is no Wi-Fi icon, because Wi-Fi is off on purpose.
+- Every 5 min (or the set interval) the device turns Wi-Fi and MQTT on: it gets the image (and sees whether it changed), gets the Home Assistant commands (the screen select among them), sends the room temperature, humidity and the battery, and turns the connection off again. A short BOOT press: a session now, Wi-Fi for 2 min to open the page, and 30 s without sleep for USB; while somebody uses the page, Wi-Fi stays on (the `/ping` check of an open page does not keep it on).
+- The device does not ask Home Assistant, healthchecks.io, meteo.gov.ua or the ping itself: the server gives the data. This screen has no alert sound.
+- Without the server the device works with what it has. When `trmnl-server` does not answer (the device tries three times with a 2 s pause), the device reads Home Assistant in the same session and, when the image is older than 15 min, draws the quadrants itself ("HA data" at the top right). Without an image and without fresh data (no Wi-Fi) it shows the last image with "data at HH:MM" and tries again in 5 min. The clock and the room data always go on.
+- The state of the last request is on the settings page ("trmnl-server image: new / no change / error at HH:MM"); after a good request it also shows the last error with its time.
+- Check the image in a browser: `http://server:15000/quad.bmp`; samples without Home Assistant: `/dev/preview?layout=quad&sample=missile` of trmnl-server in the Development mode.
 
-## Годинник (автономний режим)
+## Clock (offline mode)
 
-Екран «Годинник» — у колі KEY після «З сервера» і кнопкою на сторінці налаштувань (сторінка спершу попереджає, що Wi-Fi вимкнеться).
+The "Clock" screen is in the KEY cycle after "From server" and a button on the settings page (the page asks first: Wi-Fi goes off).
 
-- Поки він на екрані, Wi-Fi і MQTT вимкнені, запитів до HA немає, звуку тривог немає. Час іде від годинника процесора й мікросхеми годинника (PCF85063 чи DS3231): без Wi-Fi NTP його не уточнює.
-- Пристрій спить (light sleep) і прокидається раз на хвилину, щоб оновити час, температуру, вологість і заряд. Це економніше за економний режим: Wi-Fi не вмикається зовсім. Якщо економний режим увімкнено, годинник має перевагу.
-- KEY — наступний екран: він одразу показує останні дані, потім пристрій вмикає Wi-Fi й MQTT, бере дані з HA і малює екран знову. Кнопки не чекають на цей сеанс: натискання перериває очікування Wi-Fi, картинки й даних (Wi-Fi підключається далі у фоні), і KEY одразу перемикає екран. Так само під час сеансу на екрані «З сервера» і в економному режимі. BOOT коротко — оновити годинник зараз і 30 с не засинати (щоб компʼютер на USB побачив пристрій); BOOT 3 с — Wi-Fi і точка доступу (поки вона ввімкнена, годинник чекає); BOOT 10 с — скидання налаштувань.
-- Вибір екрана зберігається: після перезапуску пристрій лишається автономним.
-- Нижче 2 % — екстремальне енергозбереження: Wi-Fi і MQTT вимкнені, на екрані лише дата, скільки днів року минуло й скільки залишилось (як екран DaysInYear у trmnl-server) і внизу «Потрібно зарядити · N %». Екран змінюється раз на добу, опівночі; раз на 10 хв пристрій лише міряє батарею. Цього екрана немає ні в колі KEY, ні в налаштуваннях, ні в HA, і він не зберігається: після перезапуску пристрій знову дивиться на заряд. Кнопки екран не змінюють; BOOT — 30 с без сну (для USB), BOOT 10 с — скидання. З живленням USB пристрій повертається на свій екран.
-- Коли заряд батареї падає нижче 10 %, пристрій сам переходить на «Годинник» і запамʼятовує попередній екран (і після перезапуску). Щойно зʼявляється живлення USB (компʼютер або заряд батареї), він повертається на той екран. Якщо за цей час вибрати екран вручну (KEY, сторінка, HA), повернення не буде; знову нижче 10 % пристрій перейде на «Годинник» лише після заряду понад 15 %. На сторінці це видно в блоці «Пристрій».
-- Кнопки «Годинник» і «З сервера» на сторінці спершу попереджають про автономний режим і про те, що назад його перемикають кнопками на пристрої. Відкрита сторінка раз на 10 с питає пристрій (`GET /ping`); якщо двічі поспіль відповіді немає, вгорі з'являється «Схоже, пристрій в автономному режимі. Ви можете перемкнути режим кнопками на пристрої» (в економному режимі — пояснення про BOOT, на інших екранах — «Пристрій не відповідає»).
-- Якщо сторінку вже відкривали через HTTPS (`https://rlcd.lan` із сертифікатом власного центру), браузер пам'ятає невелику сторінку для часу без зв'язку (service worker, `/sw.js` і `/offline.html`). Коли пристрій спить, за 10 с замість «This site can't be reached» з'являється той самий текст про автономний режим — за останнім відомим станом — і час останньої відповіді пристрою. Сторінка раз на 10 с перевіряє `/ping` і відкривається сама, щойно пристрій відповість. Через HTTP браузери service worker не запускають.
-- Поки триває перевірка нової прошивки після OTA (90 с), годинник чекає, а з комп'ютером на USB пристрій не засинає (працює лог).
-- USB чипа не працює уві сні, тому компʼютер не бачить пристрій, що спить («USB device not recognized»). Після підключення до компʼютера натисніть BOOT коротко: 30 с пристрій не спить, компʼютер його бачить, і далі він не засинає, поки USB підключено. Якщо батарея заряджається, пристрій перестає засинати й сам, щойно помітить заряд (за 2–3 хв). Так само на екрані «З сервера» і в економному режимі.
+- While it is on the screen, Wi-Fi and MQTT are off, there are no Home Assistant requests and no alert sound. The time comes from the processor clock and the clock chip (PCF85063 or DS3231): without Wi-Fi NTP does not correct it.
+- The device sleeps (light sleep) and wakes up once a minute to update the time, the temperature, the humidity and the battery. This saves more than eco mode: Wi-Fi does not come on at all. When eco mode is on, the clock has priority.
+- KEY: the next screen. It shows the last data at once, then the device turns Wi-Fi and MQTT on, gets the Home Assistant data and draws the screen again. The buttons do not wait for this session: a press stops the waits for Wi-Fi, the image and the data (Wi-Fi goes on connecting in the background), and KEY changes the screen at once. The same during a session on "From server" and in eco mode. A short BOOT press updates the clock now and keeps the device awake for 30 s (so that a computer on USB sees the device); BOOT 3 s: Wi-Fi and the access point (while it is on, the clock waits); BOOT 10 s: reset of the settings.
+- The screen choice is kept: after a restart the device stays offline.
+- Below 2 %: extreme power saving. Wi-Fi and MQTT are off, the screen shows only the date, the days of the year that passed and that are left (as the DaysInYear screen of trmnl-server) and "Charge the battery · N %" at the bottom. The screen changes once a day, at midnight; every 10 min the device only reads the battery. This screen is not in the KEY cycle, in the settings or in Home Assistant, and it is not kept: after a restart the device looks at the charge again. The buttons do not change the screen; BOOT: 30 s without sleep (for USB), BOOT 10 s: reset. With USB power the device goes back to its screen.
+- When the battery falls below 10 %, the device switches to "Clock" itself and keeps the previous screen (also after a restart). As soon as there is USB power (a computer or a charger), it goes back to that screen. A manual screen choice in this time (KEY, the page, Home Assistant) cancels the return; the next switch to "Clock" below 10 % comes only after a charge above 15 %. The "Device" block of the page shows it.
+- The "Clock" and "From server" buttons on the page first warn about the offline mode and that only the buttons on the device switch it back. An open page asks the device every 10 s (`GET /ping`); after two requests without an answer the top of the page shows "The device seems to be offline. Change the mode with the buttons on the device" (in eco mode a note about BOOT, on the other screens "The device does not answer").
+- When the page was opened over HTTPS before (with a certificate of your own authority), the browser keeps a small page for the time without a connection (service worker, `/sw.js` and `/offline.html`). While the device sleeps, after 10 s the browser shows the same text about the offline mode (for the last known state) and the time of the last answer of the device instead of "This site can't be reached". The page checks `/ping` every 10 s and opens itself as soon as the device answers. Over HTTP browsers do not run service workers.
+- During the check of a new firmware after an update (90 s) the clock waits, and with a computer on USB the device does not sleep (the log works).
+- The USB of the chip does not work in sleep, so a computer does not see a sleeping device ("USB device not recognized"). After you connect a computer, press BOOT shortly: the device does not sleep for 30 s, the computer sees it, and then it does not sleep while USB is connected. When the battery charges, the device also stops sleeping by itself as soon as it sees the charge (in 2–3 min). The same on "From server" and in eco mode.
 
-## Залізо
+## Hardware
 
-Виводи взято зі схеми плати (`ESP32-S3-RLCD-4.2-schematic.pdf`), повний список — у [components/board/include/board.h](components/board/include/board.h).
+The pins come from the schematic of the board (`ESP32-S3-RLCD-4.2-schematic.pdf`); the full list is in [components/board/include/board.h](components/board/include/board.h).
 
-| Пристрій | Підключення |
+| Device | Connection |
 |---|---|
-| Екран ST7305 | SPI: SCK 11, MOSI 12, CS 40, DC 5, RST 41 |
+| ST7305 display | SPI: SCK 11, MOSI 12, CS 40, DC 5, RST 41 |
 | I2C | SDA 13, SCL 14 |
 | SHTC3 | I2C `0x70` |
-| PCF85063 (годинник на платі) | I2C `0x51` |
-| Кнопки | KEY — GPIO18, BOOT — GPIO0 |
-| Батарея | GPIO4, дільник 200K/100K (×3) |
-| Динамік 8 Ом / 2 Вт | роз'єм SPK, кодек ES8311 + підсилювач NS4150B (GPIO46) |
+| PCF85063 (clock on the board) | I2C `0x51` |
+| Buttons | KEY: GPIO18, BOOT: GPIO0 |
+| Battery | GPIO4, divider 200K/100K (×3) |
+| Speaker 8 Ω / 2 W | SPK connector, ES8311 codec + NS4150B amplifier (GPIO46) |
 
-**Модуль DS3231** (необов'язковий) тримає час на батарейці CR2032, коли плату вимкнено. Підключається дюпон-кабелями «тато–мама» до гребінки 2×8:
+**DS3231 module** (optional) keeps the time on a CR2032 cell while the board is off. Connect it with male–female jumper wires to the 2×8 header:
 
-| DS3231 | Плата | Колір дроту |
+| DS3231 | Board | Wire color |
 |---|---|---|
-| GND | GND | фіолетовий |
-| VCC | **3V3** (не VBUS!) | синій |
-| SDA | SDA (GPIO13) | зелений |
-| SCL | SCL (GPIO14) | жовтий |
+| GND | GND | violet |
+| VCC | **3V3** (not VBUS!) | blue |
+| SDA | SDA (GPIO13) | green |
+| SCL | SCL (GPIO14) | yellow |
 
-Прошивка шукає DS3231 (`0x68`) під час запуску. Якщо він є, час береться з нього, інакше — з PCF85063. Після синхронізації з NTP час записується в годинник. На модулі ZS-042 краще випаяти діод заряджання (батарейка CR2032 не заряджається) і світлодіод живлення (1–3 мА).
+The firmware looks for DS3231 (`0x68`) at the start. When it is there, the time comes from it, else from PCF85063. After an NTP synchronization the time goes to the clock. On a ZS-042 module, remove the charging diode (a CR2032 cell must not charge) and the power LED (1–3 mA).
 
-**Живлення.** Коли підключено USB, плата живиться від USB, а батарея лише заряджається й стоїть у резерві («ідеальний діод» на Q3/Q4/Q6). Перетворювач 3,3 В (TPS63020) працює в примусовому PWM, тому плата споживає ~60 мВт навіть у сні: від 18650 вистачить на кілька днів.
+**Power.** With USB the board runs from USB, and the battery only charges and stays in reserve (an "ideal diode" on Q3/Q4/Q6). The 3.3 V converter (TPS63020) works in forced PWM, so the board takes ~60 mW also in sleep: an 18650 cell lasts some days.
 
-**Сон між сигналами Wi-Fi.** Від батареї й у звичайному режимі процесор засинає (automatic light sleep) і знижує частоту, коли нічого не робить; Wi-Fi лишається підключеним і прокидається на сигнали роутера. Сторінка й MQTT відповідають трохи повільніше (на десяті частки секунди). Від USB сну немає, а з комп'ютером на USB працює лог. Стан видно на сторінці: «Сон між сигналами Wi-Fi: так / ні».
+**Sleep between Wi-Fi beacons.** On battery and in the normal mode the processor sleeps (automatic light sleep) and lowers its frequency when nothing runs; Wi-Fi stays connected and wakes up for the beacons of the router. The page and MQTT answer a little slower (tenths of a second). On USB power there is no sleep, and with a computer on USB the log works. The page shows the state: "Sleep between Wi-Fi beacons: yes / no".
 
-**Заряд батареї.** Відсоток рахується за кривою розряду Li-ion (18650): напруга 4,19 В — 100 %, 3,75 В — 50 %, 3,60 В — 20 % («Потрібно зарядити»), 3,30 В — 0 %. Між оновленнями береться медіана трьох вимірів (окремо з увімкненим і вимкненим Wi-Fi: під навантаженням Wi-Fi напруга нижча), а від батареї відсоток росте лише на 5 % і більше, тому шум напруги його не смикає. Під час звуку батарея не вимірюється: динамік бере багато струму. Під зарядом напруга вища, ніж показує заряд: струм заряду йде через опір батареї й дротів, і на початку заряду напруга стрибає на 0,2–0,3 В. Тому від USB відсоток — оцінка: напруга до заряду плюс її ріст відтоді; з 4,18 В заряджальник тримає 4,2 В (батарея тоді приблизно на 80 %), і оцінка росте щонайменше від 80 % на 1 % за 3 хв до 100 %. Під зарядом оцінка не падає. Відключення USB посеред заряду дає справжній відсоток, без стрибка зі 100 %. Якщо пристрій не бачив початку заряду (увімкнули вже на USB), відсотка немає, лише блискавка й «USB», а HA отримує порожнє значення.
+**Battery charge.** The percent comes from the discharge curve of a Li-ion cell (18650): 4.19 V is 100 %, 3.75 V is 50 %, 3.60 V is 20 % ("Charge the battery"), 3.30 V is 0 %. Between the updates the device takes the median of three readings (separately with Wi-Fi on and off: the Wi-Fi load lowers the voltage), and on battery the percent goes up only by 5 % or more, so voltage noise does not move it. During a sound the battery is not read: the speaker takes much current. On charge the voltage is higher than the charge shows: the charge current goes through the resistance of the cell and the wires, and at the start of the charge the voltage jumps by 0.2–0.3 V. So on USB the percent is an estimate: the voltage before the charge plus its rise since then; from 4.18 V the charger keeps 4.2 V (the cell is at about 80 % then), and the estimate goes up from at least 80 % by 1 % in 3 min to 100 %. On charge the estimate does not go down. An unplug in the middle of the charge gives the real percent, without a jump from 100 %. When the device did not see the start of the charge (it started on USB), there is no percent, only the bolt and "USB", and Home Assistant gets an empty value.
 
-**Визначення USB.** На платі немає сигналу «є USB»: VBUS іде лише на заряджальник і гребінку. Тому прошивка вгадує:
-- комп'ютер на USB видно точно (з USB приходять дані);
-- від зарядки чи павербанка — лише за напругою батареї: ріст напруги на 80 мВ над найнижчою напругою від батареї означає струм заряду (від батареї напруга лише падає). Найнижча й найвища напруга свої для вимкненого й увімкненого Wi-Fi: інакше вища напруга уві сні («Годинник», «З сервера») скидалася б на заряд, а старіші й нижчі виміри з Wi-Fi (на «З сервера» — раз на 5 хв) — на кінець заряду. Спад на 30 мВ від найвищої напруги заряду в тому самому стані означає, що заряд скінчився або USB відключили. 4,2 В під зарядом — ще не 100 %: з цієї напруги заряджальник лише починає дозаряд (батарея приблизно на 80 %), а повний заряд показує його світлодіод. Заряд помітно за 2–3 хв. Повна батарея в спокої — не USB: вона показує свій відсоток.
+**USB detection.** The board has no "USB present" signal: VBUS goes only to the charger and the header. So the firmware guesses:
+- a computer on USB is certain (data comes from USB);
+- a charger or a power bank shows only in the battery voltage: a rise of 80 mV over the lowest voltage on battery means a charge current (on battery the voltage only falls). The lowest and the highest voltage are separate for Wi-Fi on and off: else the higher voltage in sleep ("Clock", "From server") would look like a charge, and the older, lower readings with Wi-Fi (every 5 min on "From server") like the end of the charge. A fall of 30 mV under the highest charge voltage in the same state means that the charge ended or USB was disconnected. 4.2 V on charge is not 100 % yet: at this voltage the charger only starts the final phase (the cell is at about 80 %), and its LED shows the full charge. The device sees a charge in 2–3 min. A full battery at rest is not USB: it shows its percent.
 
-Для точного сигналу потрібні два резистори: VBUS (гребінка) → 100K → GPIO2 → 100K → GND, і `CONFIG_RLCD_VBUS_SENSE_GPIO=2`. На GPIO2 тоді 2,5 В від 5 В USB.
+For an exact signal two resistors are necessary: VBUS (header) → 100K → GPIO2 → 100K → GND, and `CONFIG_RLCD_VBUS_SENSE_GPIO=2`. GPIO2 then has 2.5 V from the 5 V of USB.
 
-## Будова
+## Structure
 
 ```text
-main/                   цикл: датчики → стан → екран і MQTT, раз на хвилину або за кнопкою
-components/board        виводи, шина I2C, кнопки (коротко / 3 с / 10 с), батарея, USB
-components/st7305       драйвер екрана (послідовність ініціалізації з прикладів Waveshare, Apache-2.0)
-components/sensors      SHTC3, годинник DS3231 / PCF85063
-components/gfx          графіка 1 біт: фігури, текст UTF-8, згенеровані шрифти
-components/settings     налаштування в NVS, початкові значення зі збірки
-components/net          Wi-Fi: основна й запасна мережа, точка доступу 10.0.0.1, DNS, SNTP, mDNS (espressif/mdns)
-components/dns_server   DNS для captive portal (з прикладу ESP-IDF, Unlicense / CC0)
-components/web          сторінка налаштувань: екран, HA, Wi-Fi, DNS, MQTT, стан пристрою
-components/fwupdate     оновлення з архіву: tar, manifest.json, SHA-256, OTA, завантаження за URL
-components/tlscert      HTTPS: ключ і запит (CSR) на пристрої, сертифікат власного центру в NVS
-components/hass         MQTT і discovery для Home Assistant (espressif/mqtt)
-components/hadata       дані з HA (шаблон, історія за 24 год), прогноз meteo.gov.ua, тривоги ubilling.net.ua (espressif/cjson)
-components/srvimg       картинка екрана «З сервера» з trmnl-server: BMP 1 біт, раз на 5 хв
-components/audio        звук: ES8311 через espressif/esp_codec_dev, сирена й тони синтезуються в коді
-components/util         час: ISO 8601, UTC без часового поясу
-components/ui           екрани: дашборд, кімната, налаштування Wi-Fi з QR-кодом (espressif/qrcode)
-components/texts        тексти вибраною мовою: tr(), trn(), tra() з таблиць, які tools/lang.py робить з lang/*.json
-lang/                   мовні файли: uk.json, en.json
-tools/lang.py           генератор таблиць текстів (запускає CMake), перевіряє ключі й підстановки
-tools/web-flasher       сайт релізу на GitHub Pages: прошивальник ESP Web Tools і архів оновлення
-tools/export-public.py  знімок сирців для публічного репозиторію з перевіркою на назви локальної мережі
-tools/screens           картинки екранів для README: код екранів, зібраний gcc, з тестовими даними
-docs/screens            мініатюри й повні картинки екранів (uk, en)
-tools/fontgen           генератор шрифтів (.NET)
-tools/fw-archive.cmake  архів прошивки з manifest.json (запускає idf.py build)
+main/                   loop: sensors → state → screen and MQTT, once a minute or on a button
+components/board        pins, I2C bus, buttons (short / 3 s / 10 s), battery, USB
+components/st7305       display driver (init sequence from the Waveshare examples, Apache-2.0)
+components/sensors      SHTC3, clock DS3231 / PCF85063
+components/gfx          1-bit graphics: shapes, UTF-8 text, generated fonts
+components/settings     settings in NVS, start values from the build
+components/net          Wi-Fi: main and backup network, access point 10.0.0.1, DNS, SNTP, mDNS (espressif/mdns)
+components/dns_server   DNS for the captive portal (from the ESP-IDF example, Unlicense / CC0)
+components/web          settings page: screen, HA, Wi-Fi, DNS, MQTT, device state, first-start wizard
+components/fwupdate     update from an archive: tar, manifest.json, SHA-256, OTA, download from a URL
+components/tlscert      HTTPS: key and request (CSR) on the device, certificate of your own authority in NVS
+components/hass         MQTT and discovery for Home Assistant (espressif/mqtt)
+components/hadata       HA data (template, 24-hour history), meteo.gov.ua forecast and weather, ubilling.net.ua alerts (espressif/cjson)
+components/srvimg       image of the "From server" screen from trmnl-server: 1-bit BMP, every 5 min
+components/audio        sound: ES8311 through espressif/esp_codec_dev, the siren and the tones are made in code
+components/util         time: ISO 8601, UTC without a time zone
+components/ui           screens: dashboard, room, Wi-Fi setup with a QR code (espressif/qrcode), ...
+components/texts        texts in the selected language: tr(), trn(), tra() from the tables of tools/lang.py
+lang/                   language files: uk.json, en.json
+tools/lang.py           generator of the text tables (CMake runs it), checks the keys and the conversions
+tools/web-flasher       release site on GitHub Pages: ESP Web Tools flasher and update archive
+tools/export-public.py  snapshot of the sources for a public repository, with a check for local network names
+tools/screens           pictures of the screens for the README: the screen code built with gcc, sample data
+docs/screens            thumbnails and full pictures of the screens (uk, en)
+tools/fontgen           font generator (.NET)
+tools/fw-archive.cmake  firmware archive with manifest.json (idf.py build runs it)
 ```
 
-## Оновлення прошивки через Wi-Fi (OTA)
+## Firmware update over Wi-Fi (OTA)
 
-Прошивка для оновлення — архів `build/rlcd-dashboard-<версія>.tar`, його робить `idf.py build`. В архіві два файли, саме в такому порядку:
+The firmware for the update is the archive `build/rlcd-dashboard-<version>.tar`; `idf.py build` makes it. The archive has two files, in this order:
 
-- `manifest.json` — проект, версія, коміт git, час збірки, відбиток збірки (SHA-256 ELF-файлу), чип, назва й розмір файлу прошивки, SHA-256:
+- `manifest.json`: project, version, git commit, build time, build fingerprint (SHA-256 of the ELF file), chip, name and size of the firmware file, SHA-256:
   ```json
   {
     "project": "rlcd-dashboard",
@@ -347,84 +349,76 @@ tools/fw-archive.cmake  архів прошивки з manifest.json (запус
     "sha256": "…"
   }
   ```
-- `rlcd-dashboard.bin` — сама прошивка.
+- `rlcd-dashboard.bin`: the firmware itself.
 
-На сторінці налаштувань, у розділі «Оновлення прошивки», є два способи:
+The "Firmware update" section of the settings page has these ways:
 
-- **З файлу:** виберіть архів і натисніть «Оновити з файлу».
-- **За адресою:** вкажіть URL архіву (`http://` або `https://`, з переадресаціями) і натисніть «Завантажити й оновити». Пристрій сам завантажує архів, а сторінка показує хід. Адреса зберігається в налаштуваннях для наступного разу. Для `https://` сертифікат сервера має бути від загальновідомого центру сертифікації (вбудований набір ESP-IDF).
-- **Перевірити оновлення:** пристрій читає за тією ж адресою лише `manifest.json` (перший запис архіву, без прошивки) і порівнює його зі своєю прошивкою. Та сама збірка (той самий відбиток ELF) — «оновлення немає»; інакше пише, яка версія на сервері (новіша, старіша чи інша збірка тієї ж версії, з комітом і часом збірки), і питає, чи оновити. Адреса за замовчуванням — `CONFIG_RLCD_OTA_URL`: лише в збірці на GitHub це адреса GitHub Pages репозиторію (див. «Збирання на GitHub»); локальна збірка бере її з `sdkconfig.secrets`, а без нього поле порожнє. Останню введену адресу пристрій памʼятає. Щоб перевірка бачила нові збірки, кладіть їх на сервер під тією самою назвою (або змінюйте адресу, коли змінюється версія в назві файлу).
+- **From a file:** select the archive and press "Update from the file".
+- **From an address:** type the URL of the archive (`http://` or `https://`, with redirects) and press "Download and update". The device downloads the archive itself, and the page shows the progress. The settings keep the address for the next time. For `https://` the certificate of the server must come from a well-known certificate authority (the ESP-IDF bundle).
+- **Check for an update:** the device reads only `manifest.json` from the same address (the first entry of the archive, without the firmware) and compares it with its own firmware. The same build (the same ELF fingerprint) gives "no update"; else the page tells the version on the server (newer, older or another build of the same version, with the commit and the build time) and asks before the update. The default address is `CONFIG_RLCD_OTA_URL`: only the build on GitHub sets the GitHub Pages address of its repository (see "Build on GitHub"); a local build takes it from `sdkconfig.secrets`, without it the field is empty. The device keeps the last address. To let the check see new builds, put them on the server under the same name (or change the address when the version in the file name changes).
 
-Перевірки:
+Checks:
 
-- Пристрій читає архів потоком. Спершу `manifest.json`: проект і чип мають збігатися з пристроєм, розмір — уміщатися в розділ.
-- Потім початок прошивки: застосунок для ESP32-S3 цього проекту, і версія в ньому та сама, що в маніфесті. Файл `.bin` без архіву, завантажувач, повний образ флешу чи чужу прошивку пристрій відкидає, нічого не стираючи.
-- Під час запису в інший розділ (`ota_0` / `ota_1`) пристрій рахує SHA-256. Новий розділ стає завантажувальним, лише якщо SHA-256 збігається з маніфестом і `esp_ota_end` підтверджує образ. Під час запису на екрані — «Оновлення прошивки…».
-- SHA-256 захищає від пошкодженого чи обірваного файлу. Від підробленого захищає підпис: `esp_ota_end` перевіряє підпис RSA-3072 відкритим ключем поточної прошивки (див. «Підпис прошивки»).
-- Після перезапуску нова версія має за 90 с двічі оновити екран. Тоді вона підтверджує себе. Якщо ні (зависла, перезапускається), завантажувач повертає попередню версію.
-- Налаштування (NVS) оновлення не змінює.
+- The device reads the archive as a stream. First `manifest.json`: the project and the chip must be the ones of the device, the size must fit the partition.
+- Then the start of the firmware: an application for the ESP32-S3 of this project, with the same version as the manifest. A `.bin` file without an archive, a bootloader, a full flash image or another firmware is refused, and nothing is erased.
+- During the write to the other partition (`ota_0` / `ota_1`) the device calculates SHA-256. The new partition becomes the boot partition only when SHA-256 is the one of the manifest and `esp_ota_end` accepts the image. During the write the screen shows "Firmware update…".
+- SHA-256 protects from a damaged or cut file. The signature protects from a forged one: `esp_ota_end` checks the RSA-3072 signature with the public key of the running firmware (see "Firmware signature").
+- After the restart the new version must update the screen twice in 90 s. Then it confirms itself. If not (it hangs or restarts), the bootloader goes back to the previous version.
+- The update does not change the settings (NVS).
 
-Відкат вимагає параметра завантажувача `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` (він у `sdkconfig.defaults`). Завантажувач оновлюється лише через USB, тому перший раз після появи OTA: видаліть `sdkconfig` у теці проекту, зберіть і прошийте через USB. Чи ввімкнено відкат, видно в блоці «Пристрій» на сторінці налаштувань. Параметр anti-rollback не вмикати: він пропалює eFuse.
+The rollback needs the bootloader setting `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` (it is in `sdkconfig.defaults`). Only USB updates the bootloader, so the first time after OTA came: delete `sdkconfig` in the project folder, build and flash through USB. The "Device" block of the settings page shows whether the rollback is on. Do not turn on anti-rollback: it burns eFuses.
 
-### Підпис прошивки
+### Firmware signature
 
-Пристрій приймає через Wi-Fi лише прошивку, підписану вашим ключем (`CONFIG_SECURE_SIGNED_APPS_NO_SECURE_BOOT` і `CONFIG_SECURE_SIGNED_ON_UPDATE_NO_SECURE_BOOT` у `sdkconfig.defaults`, схема RSA-3072 від Secure Boot V2).
+Over Wi-Fi the device accepts only firmware signed with your key (`CONFIG_SECURE_SIGNED_APPS_NO_SECURE_BOOT` and `CONFIG_SECURE_SIGNED_ON_UPDATE_NO_SECURE_BOOT` in `sdkconfig.defaults`, the RSA-3072 scheme of Secure Boot V2).
 
-- `idf.py build` підписує `build\rlcd-dashboard.bin` ключем `rlcd-signing-key.pem` (`CONFIG_SECURE_BOOT_SIGNING_KEY`). Без ключа збірка зупиняється з підказкою, як його створити.
-- Нову прошивку пристрій перевіряє відкритим ключем із підпису поточної. Тому першу підписану прошивку треба записати через USB, а далі — оновлювати через Wi-Fi.
-- Це не апаратний Secure Boot: eFuse не пропалюються, і через USB прошити можна будь-що. Підпис захищає оновлення через мережу.
-- Якщо ключ загубиться, оновити через Wi-Fi вже не вийде: створіть новий ключ і прошийте через USB.
-- Ключ не можна класти в git (`*.pem` у `.gitignore`).
+- `idf.py build` signs `build/rlcd-dashboard.bin` with the key `rlcd-signing-key.pem` (`CONFIG_SECURE_BOOT_SIGNING_KEY`). Without the key the build stops and tells how to make it.
+- The device checks a new firmware with the public key in the signature of the running one. So write the first signed firmware through USB, then update over Wi-Fi.
+- This is not the hardware Secure Boot: no eFuses are burned, and USB can flash anything. The signature protects the update over the network.
+- When the key is lost, the update over Wi-Fi is not possible any more: make a new key and flash through USB.
+- Never put the key into git (`*.pem` is in `.gitignore`).
 
-## HTTPS для сторінки налаштувань
+## HTTPS for the settings page
 
-Сторінка може працювати через HTTPS із сертифікатом вашого власного центру сертифікації (CA). Публічний центр на домашнє ім'я на кшталт `rlcd.lan` сертифікат не видасть.
+The page can work over HTTPS with a certificate of your own certificate authority (CA). A public authority does not issue certificates for home names such as `rlcd.lan`.
 
-- **Ім'я пристрою** — поле «Ім'я пристрою в мережі» на сторінці (типово `rlcd.local`, у збірці — `CONFIG_RLCD_HOST`). Перша частина (`rlcd`) іде роутеру як DHCP-ім'я й в mDNS (`rlcd.local`); роутери з локальним DNS (наприклад, OpenWrt з доменом `lan`) ще й відповідають на `rlcd.lan`. Повне ім'я — ім'я сертифіката: з `rlcd.lan` сторінка перенаправляє на `https://rlcd.lan`, тож сертифікат має бути для нього (можна додати в сертифікат обидва імена: `DNS:rlcd.lan,DNS:rlcd.local`).
-- **Центр сертифікації** — ваш власний, наприклад на OpenSSL. Створення центру й встановлення його `ca.crt` на телефони й комп'ютери робляться один раз. Сертифікат пристрою — для імені пристрою (`subjectAltName=DNS:rlcd.lan`, за бажанням ще й `IP:<адреса>`), з `extendedKeyUsage=serverAuth`; браузери приймають строк до 825 днів.
-- **Спосіб 1, ключ на пристрої** (ключ ніколи не виходить з пристрою): на сторінці «Створити ключ і запит (CSR)» → браузер зберігає `rlcd.lan.csr`. Підпишіть запит своїм центром, наприклад:
+- **Device name**: the "Device name in the network" field on the page (default `rlcd.local`, in the build `CONFIG_RLCD_HOST`). The first part (`rlcd`) goes to the router as the DHCP name and to mDNS (`rlcd.local`); routers with a local DNS (for example, OpenWrt with the `lan` domain) also answer for `rlcd.lan`. The full name is the name of the certificate: with `rlcd.lan` the page redirects to `https://rlcd.lan`, so the certificate must be for it (a certificate can have both names: `DNS:rlcd.lan,DNS:rlcd.local`).
+- **Certificate authority**: your own, for example with OpenSSL. Make the authority and install its `ca.crt` on phones and computers once. The device certificate is for the device name (`subjectAltName=DNS:rlcd.local`, optionally also `IP:<address>`), with `extendedKeyUsage=serverAuth`; browsers accept up to 825 days.
+- **Way 1, the key on the device** (the key never leaves the device): on the page "Make a key and a request (CSR)" → the browser saves `rlcd.local.csr`. Sign the request with your authority, for example:
   ```bash
-  openssl x509 -req -in rlcd.lan.csr -CA ca.crt -CAkey ca.key -CAcreateserial -days 825 -sha256 \
-    -extfile <(printf 'subjectAltName=DNS:rlcd.lan\nextendedKeyUsage=serverAuth') -out rlcd.lan.crt
+  openssl x509 -req -in rlcd.local.csr -CA ca.crt -CAkey ca.key -CAcreateserial -days 825 -sha256 \
+    -extfile <(printf 'subjectAltName=DNS:rlcd.local\nextendedKeyUsage=serverAuth') -out rlcd.local.crt
   ```
-  Потім на сторінці «Встановити сертифікат» з файлом `rlcd.lan.crt`.
-- **Спосіб 2, ключ від центру** (для пристрою без запиту): створіть центром ключ і сертифікат для імені пристрою → на сторінці «Встановити ключ і сертифікат». Потім видаліть ключ з комп'ютера.
-- Пристрій перевіряє, що сертифікат пасує до ключа й не прострочений, зберігає їх у NVS і перезапускається. Далі в домашній мережі `http://…` перенаправляє на `https://…` з тим самим ім'ям чи IP. Через точку доступу сторінка лишається на HTTP (телефони відкривають сторінку підключення лише через HTTP).
-- Строк сертифіката видно на сторінці. Для поновлення повторіть спосіб 1 чи 2. Кнопка «Видалити сертифікат» повертає сторінку лише на HTTP.
-- Якщо HTTPS-сервер не запускається (наприклад, пошкоджений сертифікат), сторінка лишається на HTTP, щоб пристрій був доступний.
+  Then "Install the certificate" on the page with the file `rlcd.local.crt`.
+- **Way 2, the key from the authority** (for a device without a request): make a key and a certificate for the device name with your authority → "Install the key and the certificate" on the page. Then delete the key on the computer.
+- The device checks that the certificate fits the key and is not expired, keeps them in NVS and restarts. Then on the home network `http://…` redirects to `https://…` with the same name or IP. Through the access point the page stays on HTTP (phones open the sign-in page only over HTTP).
+- The page shows the validity of the certificate. To renew it, repeat way 1 or 2. "Delete the certificate" sets the page back to HTTP only.
+- When the HTTPS server does not start (for example, a damaged certificate), the page stays on HTTP, so that the device stays reachable.
 
-## Мови й тексти
+## Languages and texts
 
-Усі тексти екрана, сторінки налаштувань, повідомлень і сутностей HA — у мовних файлах [lang/uk.json](lang/uk.json) і [lang/en.json](lang/en.json). Мову вибирають у майстрі першого налаштування або на сторінці (розділ «Сторінка налаштувань», після збереження пристрій перезапускається); за замовчуванням — `CONFIG_RLCD_LANGUAGE`.
+All texts of the screen, the settings page, the messages and the Home Assistant entities are in the language files [lang/uk.json](lang/uk.json) and [lang/en.json](lang/en.json). Select the language in the first-start wizard or on the page ("Settings page" section; the device restarts after the save); the default is `CONFIG_RLCD_LANGUAGE`.
 
-- Ключ — текст, `"date.day_month": "%d %s"`. У тексті можуть бути підстановки `printf` (`%s`, `%d`, `%.1f`).
-- Множина — об'єкт із формами правила мови: українська `{"one": "%d день", "few": "%d дні", "many": "%d днів"}`, англійська `{"one": "%d day", "other": "%d days"}`.
-- Список — масив (місяці, дні тижня, назви екранів, міста, області); порядок фіксований кодом.
-- Ключі `js.*` ідуть у скрипти сторінки одним об'єктом `L`.
-- `_language` — код, назва мови й правило множини.
+- A key with a text: `"date.day_month": "%d %s"`. A text can have `printf` conversions (`%s`, `%d`, `%.1f`).
+- A plural is an object with the forms of the plural rule of the language: Ukrainian `{"one": "%d день", "few": "%d дні", "many": "%d днів"}`, English `{"one": "%d day", "other": "%d days"}`.
+- A list is an array (months, weekdays, screen names, cities, regions); the code sets the order.
+- The `js.*` keys go to the page scripts as one object `L`.
+- `_language`: the code, the name of the language and the plural rule.
 
-[tools/lang.py](tools/lang.py) під час збирання робить із них таблиці C (`texts_ids.h`, `texts_data.c` у теці збірки), а код бере тексти через `tr(T_...)`, `trn(T_..., n)` (множина) і `tra(T_..., i)` (список). Збирання зупиняється, якщо в мові бракує ключа, тип не той, у списку інша кількість елементів або підстановки `%` не збігаються з українськими за типом і порядком (неправильний `%s` у перекладі поклав би прошивку). Довжину списків, які має знати код (12 місяців, 6 екранів, міста, області), перевіряє `_Static_assert`.
+[tools/lang.py](tools/lang.py) makes C tables from them at the build (`texts_ids.h`, `texts_data.c` in the build folder), and the code gets the texts with `tr(T_...)`, `trn(T_..., n)` (plural) and `tra(T_..., i)` (list). The build stops when a language misses a key, has another kind, another number of list items or `%` conversions that are not the Ukrainian ones in type and order (a wrong `%s` in a translation would crash the firmware). `_Static_assert` checks the lengths of the lists that the code must know (12 months, 6 screens, cities, regions).
 
-Нова мова: скопіюйте `lang/en.json` у `lang/<код>.json`, змініть `_language` і тексти; для мови з іншим правилом множини додайте правило в `tools/lang.py` (`PLURAL_FORMS`) і функцію `texts_plural_<правило>` у [components/texts/texts.c](components/texts/texts.c). Шрифти мають латиницю й кирилицю; для інших абеток їх треба перегенерувати (див. «Шрифти»).
+A new language: copy `lang/en.json` to `lang/<code>.json`, change `_language` and the texts; for a language with another plural rule add the rule to `tools/lang.py` (`PLURAL_FORMS`) and a function `texts_plural_<rule>` to [components/texts/texts.c](components/texts/texts.c). The fonts have Latin and Cyrillic; other scripts need new fonts (see "Fonts").
 
-## Шрифти
+## Fonts
 
-Шрифти — Roboto (Apache License 2.0) у вигляді бітмапів 1 біт. Генератор малює гліфи тими самими бібліотеками (SixLabors) і розмірами, що й `trmnl-server`, і робить їх чорно-білими з порогом 50 %, як сервер. Тому координати з `DashboardRenderer.cs` переносяться без змін.
+The fonts are Roboto (Apache License 2.0) as 1-bit bitmaps. The generator draws the glyphs with the same libraries (SixLabors) and sizes as `trmnl-server` and makes them black and white with a 50 % threshold, as the server. So the coordinates of `DashboardRenderer.cs` work without changes.
 
-Набір символів: латиниця, кирилиця (з ґ, є, і, ї), `° · « » – — … № ’ ʼ −`. Великі шрифти 56 і 64 px (`roboto_b56d`, `roboto_b64d`) мають лише цифри й `+ − , . : ° % —`, щоб не займати зайве місце. Розміри задано в [tools/fontgen/fonts.json](tools/fontgen/fonts.json). Після зміни перегенеруйте:
+Character set: Latin, Cyrillic (with ґ, є, і, ї), `° · « » – — … № ’ ʼ −`. The large 56 and 64 px fonts (`roboto_b56d`, `roboto_b64d`) have only the digits and `+ − , . : ° % —`, to save space. The sizes are in [tools/fontgen/fonts.json](tools/fontgen/fonts.json). After a change make them again:
 
 ```powershell
 dotnet run --project tools/fontgen -- tools/fontgen/fonts.json
 ```
 
-## План
+## License
 
-1. Текст для екрана «Текст» також із HA (текстове поле MQTT).
-2. BLE (BTHome) для температури й вологості з перемикачем у HA; між оновленнями в економному режимі BLE вимкнено.
-3. Енергозбереження і в звичайному режимі (автоматичний light sleep між запитами).
-4. Тиха година вночі, статичний IP.
-5. Тривоги з [api.ukrainealarm.com](https://api.ukrainealarm.com/) — друге джерело без HA, з ключем API (запит на ключ надіслано): вибір джерела на сторінці, ключ у налаштуваннях.
-
-## Ліцензія
-
-[MIT](LICENSE). Шрифти Roboto й зроблені з них бітмапи — Apache License 2.0; що ще взято з інших проектів — у [NOTICE](NOTICE).
+[MIT](LICENSE). The Roboto fonts and the bitmaps made from them: Apache License 2.0; the other parts from other projects are in [NOTICE](NOTICE).
