@@ -947,7 +947,7 @@ static esp_err_t root_get(httpd_req_t *req)
         send_str(req, option);
     }
     send_str(req, "</select>");
-    text_field(req, "host", T_PAGE_HOST, s->host, 63, "rlcd.lan");
+    text_field(req, "host", T_PAGE_HOST, s->host, 63, "rlcd.local");
     password_field(req, "web_pass", T_PAGE_WEB_PASS, s->web_pass, 63);
     send_str(req, "<p><small>");
     send_str(req, tr(T_PAGE_WEB_PASS_NOTE));
@@ -1962,5 +1962,10 @@ esp_err_t web_start(const web_config_t *config)
     }
     httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, not_found);
     ESP_LOGI(TAG, "Settings page is on port %d%s", cfg.server_port, s_https ? " (redirect to HTTPS)" : "");
+    // mDNS: the browsers of the home network see the page as a service of <name>.local.
+    net_mdns_service("_http", cfg.server_port, s_version);
+    if (s_https) {
+        net_mdns_service("_https", 443, s_version);
+    }
     return ESP_OK;
 }

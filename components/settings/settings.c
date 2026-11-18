@@ -76,7 +76,7 @@ static const field_t FIELDS[] = {
     FIELD(snd_drone, "warble"),
     FIELD(snd_clear, "chime"),
     FIELD(ota_url, CONFIG_RLCD_OTA_URL),
-    FIELD(host, "rlcd.lan"),
+    FIELD(host, CONFIG_RLCD_HOST),
     FIELD(lang, CONFIG_RLCD_LANGUAGE),
     FIELD(has_ha, ""),
     FIELD(has_srv, ""),

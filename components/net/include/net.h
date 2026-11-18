@@ -42,6 +42,12 @@ int net_rssi(void);
 // Write the IP address ("192.168.1.10") or an empty string.
 void net_ip(char *buf, size_t len);
 
+// Return the mDNS host name without ".local" ("rlcd"): the first label of the device name. "" if mDNS is off.
+const char *net_mdns_host(void);
+
+// Announce a service of the device over mDNS, for example "_http" on port 80. version goes to the TXT record.
+void net_mdns_service(const char *type, unsigned port, const char *version);
+
 // Setup access point
 bool net_ap_active(void);
 const char *net_ap_ssid(void);

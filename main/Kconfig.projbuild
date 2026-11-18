@@ -144,6 +144,13 @@ menu "RLCD dashboard"
             WMO index of the station, for example 33345 (Kyiv). Keep it empty for no forecast.
             The settings page and Home Assistant select a regional centre from a list.
 
+    config RLCD_HOST
+        string "Device name in the network"
+        default "rlcd.local"
+        help
+            The first label ("rlcd") is the DHCP host name and the mDNS name: the device answers as rlcd.local.
+            The full name is the name of the HTTPS certificate. The settings page changes it.
+
     config RLCD_SERVER_URL
         string "trmnl-server image for the server screen"
         default ""

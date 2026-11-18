@@ -62,7 +62,7 @@ typedef struct {
     char snd_clear[12];     // the sound when all alerts end
 
     char ota_url[256];      // the last URL of a firmware archive (update from the settings page)
-    char host[64];          // the device name on the home network, for example "rlcd.lan" (DHCP, HTTPS)
+    char host[64];          // the device name on the home network, for example "rlcd.local" (DHCP, mDNS, HTTPS)
     char lang[8];           // the language of the screen, the page and Home Assistant: "uk", "en"
     // The answers of the first-start wizard: "1" yes, "0" no, "" = not asked yet (the page shows the wizard).
     char has_ha[4];         // Home Assistant: without it the screens with its data are not available

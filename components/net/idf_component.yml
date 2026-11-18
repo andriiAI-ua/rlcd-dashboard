@@ -1,0 +1,3 @@
+## mDNS from the ESP Component Registry (it is not part of ESP-IDF 6.x): the device answers as <name>.local.
+dependencies:
+  espressif/mdns: "~1.14.1"

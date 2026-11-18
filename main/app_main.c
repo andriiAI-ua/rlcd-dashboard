@@ -1108,6 +1108,9 @@ static void web_status(char *buf, size_t len)
     } else {
         LINE(tr(T_STATUS_WIFI_OFF), s->wifi_reason);
     }
+    if (net_mdns_host()[0]) {
+        LINE(tr(T_STATUS_MDNS), net_mdns_host());
+    }
     if (s->ap_active) {
         LINE(tr(T_STATUS_AP), s->ap_ssid, s->ap_ip);
     }

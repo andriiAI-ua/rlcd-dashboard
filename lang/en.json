@@ -225,7 +225,7 @@
   "page.password": "Password",
   "page.mqtt_prefix": "Discovery prefix",
   "page.page_legend": "Settings page",
-  "page.host": "Device name in the network (for the router and HTTPS)",
+  "page.host": "Device name in the network: the first part is the name for the router and mDNS (<b>rlcd</b>.local), the full name is for HTTPS",
   "page.web_pass": "Page password (user admin)",
   "page.language": "Language (Мова)",
   "page.web_pass_note": "Without a password anybody in the home network can open the page. Through the access point of the device the password is never necessary.",
@@ -245,7 +245,7 @@
   "msg.bad_dns": "DNS must be an IPv4 address, for example 192.168.1.1.",
   "msg.bad_mqtt": "The broker address must start with mqtt:// or mqtts://.",
   "msg.bad_ha": "The Home Assistant address must start with http:// or https://.",
-  "msg.bad_host": "Device name: Latin letters, digits, hyphens and dots, for example rlcd.lan.",
+  "msg.bad_host": "Device name: Latin letters, digits, hyphens and dots, for example rlcd.local.",
   "msg.save_failed": "Cannot write the settings.",
   "msg.saved": "Saved. The device restarts and connects with the new settings.",
   "msg.ota_bad_size": "The file size is not correct for a firmware archive.",
@@ -500,5 +500,6 @@
   "page.has_ha": "I have Home Assistant (without it «Dashboard» and «4 quadrants» are not available)",
   "page.has_srv": "I have trmnl-server (without it «From server» is not available)",
 
-  "status.weather_now": "Weather now: meteo.gov.ua, %s, observation at %02d:%02d"
+  "status.weather_now": "Weather now: meteo.gov.ua, %s, observation at %02d:%02d",
+  "status.mdns": "Network name: %s.local (mDNS)"
 }

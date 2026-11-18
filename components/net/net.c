@@ -1,6 +1,7 @@
 // Wi-Fi with a main and a backup network, a setup access point with a captive portal, DNS servers and SNTP.
 // A separate task does the connection steps. The event handler only records the events.
 #include "net.h"
+#include "mdns.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -305,6 +306,25 @@ static void net_task(void *arg)
     }
 }
 
+static char s_mdns_host[33];     // the mDNS host name, "" = mDNS is off
+
+const char *net_mdns_host(void)
+{
+    return s_mdns_host;
+}
+
+void net_mdns_service(const char *type, unsigned port, const char *version)
+{
+    if (!s_mdns_host[0]) {
+        return;
+    }
+    mdns_txt_item_t txt[] = { { "path", "/" }, { "version", version ? version : "" } };
+    const esp_err_t err = mdns_service_add(NULL, type, "_tcp", (uint16_t)port, txt, sizeof(txt) / sizeof(txt[0]));
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "mDNS: no service %s on port %u: %s", type, port, esp_err_to_name(err));
+    }
+}
+
 void net_start(const settings_t *settings, const char *ntp_server, net_change_cb_t on_change)
 {
     s_on_change = on_change;
@@ -334,8 +354,8 @@ void net_start(const settings_t *settings, const char *ntp_server, net_change_cb
     s_sta = esp_netif_create_default_wifi_sta();
     s_ap = esp_netif_create_default_wifi_ap();
 
-    // The DHCP host name is the first label of the device name ("rlcd" of "rlcd.lan").
-    // Routers with a local DNS (for example, OpenWrt) then resolve "rlcd.lan".
+    // The DHCP host name is the first label of the device name ("rlcd" of "rlcd.local" or "rlcd.lan").
+    // Routers with a local DNS (for example, OpenWrt) then resolve "rlcd.lan"; mDNS gives "rlcd.local".
     char label[33];
     size_t n = 0;
     for (const char *p = settings->host; *p && *p != '.' && n + 1 < sizeof(label); p++) {
@@ -344,6 +364,17 @@ void net_start(const settings_t *settings, const char *ntp_server, net_change_cb
     label[n] = '\0';
     if (label[0]) {
         esp_netif_set_hostname(s_sta, label);
+    }
+    // mDNS on the home network and in the access point of the device: computers and phones find it as
+    // <label>.local without a local DNS. web_start() adds the services of the settings page.
+    const esp_err_t mdns_err = mdns_init();
+    if (mdns_err == ESP_OK) {
+        strlcpy(s_mdns_host, label[0] ? label : "rlcd", sizeof(s_mdns_host));
+        mdns_hostname_set(s_mdns_host);
+        mdns_instance_name_set("RLCD Dashboard");
+        ESP_LOGI(TAG, "mDNS: %s.local", s_mdns_host);
+    } else {
+        ESP_LOGE(TAG, "mDNS does not start: %s", esp_err_to_name(mdns_err));
     }
 
     wifi_init_config_t init = WIFI_INIT_CONFIG_DEFAULT();
