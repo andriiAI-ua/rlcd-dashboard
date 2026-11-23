@@ -68,6 +68,16 @@ int main(int argc, char **argv)
     ha.forecast_valid = true;
     ha.forecast_has_temp = true;
     ha.forecast_temp = 7;
+    // The city forecast of meteo.gov.ua: the night (03:00) and the day (15:00), temperature and FMI SmartSymbol.
+    static const int DAYS[HADATA_DAYS][4] = {
+        { 0, 104, 1, 7 }, { 0, 107, 1, 47 }, { -1, 154, 0, 4 }, { -4, 107, -3, 57 }, { -4, 107, -1, 7 },
+        { -5, 104, -4, 6 }, { -3, 154, -2, 2 }, { -4, 106, -4, 54 }, { -8, 107, -7, 4 }, { -11, 101, -5, 1 },
+    };
+    for (int i = 0; i < HADATA_DAYS; i++) {
+        ha.days[i].night = (hadata_point_t){ .valid = true, .temp = DAYS[i][0], .symbol = DAYS[i][1] };
+        ha.days[i].day = (hadata_point_t){ .valid = true, .temp = DAYS[i][2], .symbol = DAYS[i][3] };
+    }
+    ha.days_at = now - 3600;
 
     static uint8_t server_image[STRIDE * GFX_HEIGHT];
 
@@ -94,13 +104,15 @@ int main(int argc, char **argv)
         s.battery_percent = 76;
         s.wifi_configured = true;
         s.wifi_connected = true;
+        s.forecast_city = true;
 
         static const struct {
             ui_screen_t screen;
             const char *name;
         } SCREENS[] = {
             { UI_SCREEN_DASHBOARD, "dashboard" }, { UI_SCREEN_ROOM, "room" }, { UI_SCREEN_NOTE, "note" },
-            { UI_SCREEN_QUAD, "quad" }, { UI_SCREEN_CLOCK, "clock" },
+            { UI_SCREEN_QUAD, "quad" }, { UI_SCREEN_QUAD5, "quad5" }, { UI_SCREEN_DAYS10, "days10" },
+            { UI_SCREEN_CLOCK, "clock" },
         };
         for (size_t i = 0; i < sizeof(SCREENS) / sizeof(SCREENS[0]); i++) {
             s.screen = SCREENS[i].screen;

@@ -22,6 +22,13 @@ _Static_assert(T_DATE_MONTHS_ITEMS == 12, "lang: date.months must have 12 items"
 _Static_assert(T_DATE_WEEKDAYS_ITEMS == 7, "lang: date.weekdays must have 7 items (from Sunday)");
 _Static_assert(T_SCREEN_NAMES_ITEMS == UI_SCREEN_COUNT, "lang: screen.names must have one item per screen");
 _Static_assert(T_AQI_LEVELS_ITEMS == 6, "lang: aqi.levels must have 6 items");
+_Static_assert(T_DATE_WEEKDAYS_TITLE_ITEMS == 7, "lang: date.weekdays_title must have 7 items (from Sunday)");
+_Static_assert(T_DATE_WEEKDAYS_SHORT_ITEMS == 7, "lang: date.weekdays_short must have 7 items (from Sunday)");
+_Static_assert(T_WEATHER_SKY_ITEMS == 6, "lang: weather.sky must have 6 items");
+_Static_assert(T_WEATHER_DRIZZLE_ITEMS == 3, "lang: weather.drizzle must have 3 items");
+_Static_assert(T_WEATHER_RAIN_ITEMS == 3, "lang: weather.rain must have 3 items");
+_Static_assert(T_WEATHER_SLEET_ITEMS == 3, "lang: weather.sleet must have 3 items");
+_Static_assert(T_WEATHER_SNOW_ITEMS == 3, "lang: weather.snow must have 3 items");
 
 #define MONTH(t)   tra(T_DATE_MONTHS, (t)->tm_mon)
 #define WEEKDAY(t) tra(T_DATE_WEEKDAYS, (t)->tm_wday)
@@ -35,6 +42,10 @@ const char *ui_screen_id(ui_screen_t screen)
         return "note";
     case UI_SCREEN_QUAD:
         return "quad";
+    case UI_SCREEN_QUAD5:
+        return "quad5";
+    case UI_SCREEN_DAYS10:
+        return "days10";
     case UI_SCREEN_SERVER:
         return "server";
     case UI_SCREEN_CLOCK:
@@ -54,6 +65,12 @@ ui_screen_t ui_screen_from_id(const char *id)
     }
     if (id && strcmp(id, "quad") == 0) {
         return UI_SCREEN_QUAD;
+    }
+    if (id && strcmp(id, "quad5") == 0) {
+        return UI_SCREEN_QUAD5;
+    }
+    if (id && strcmp(id, "days10") == 0) {
+        return UI_SCREEN_DAYS10;
     }
     if (id && strcmp(id, "server") == 0) {
         return UI_SCREEN_SERVER;
@@ -883,8 +900,8 @@ static void quad_time(const ui_state_t *s, const struct tm *t)
     gfx_text(&roboto_b64d, cx, y + 146, GFX_ALIGN_CENTER, GFX_WHITE, buf);
 }
 
-// Top right, white: the outdoor temperature and the air quality: the level in words is the main text
-// ("чисте"), the AQI number is smaller under it.
+// Top right, white: the outdoor temperature and humidity, and the air quality: the level in words is the main
+// text ("чисте"), the AQI number is smaller under it.
 static void quad_air(const ha_data_t *h)
 {
     // 5 px down from the top: the top row (battery, percent, note) is over the temperature. trmnl-server
@@ -897,7 +914,16 @@ static void quad_air(const ha_data_t *h)
         strcpy(buf, "—");
     }
     gfx_text(&roboto_b56d, cx, y + 62, GFX_ALIGN_CENTER, GFX_BLACK, buf);
-    gfx_text(&roboto_r14, cx, y + 82, GFX_ALIGN_CENTER, GFX_BLACK, tr(T_OUTDOOR));
+    // "надворі · вологість 74 %"
+    char line[64];
+    if (h && h->humidity.valid) {
+        char hum[32];
+        snprintf(hum, sizeof(hum), tr(T_OUTDOOR_HUMIDITY), round(h->humidity.value));
+        snprintf(line, sizeof(line), "%s · %s", tr(T_OUTDOOR), hum);
+    } else {
+        strlcpy(line, tr(T_OUTDOOR), sizeof(line));
+    }
+    gfx_text(&roboto_r14, cx, y + 82, GFX_ALIGN_CENTER, GFX_BLACK, line);
     if (h && h->aqi.valid) {
         const double aqi = round(h->aqi.value);
         quad_text(cx, y + 116, 30, GFX_BLACK, aqi_level(aqi));
@@ -1287,6 +1313,507 @@ static void draw_message(const char *text)
     gfx_text(&roboto_b20, GFX_WIDTH / 2, y + 48, GFX_ALIGN_CENTER, GFX_WHITE, text);
 }
 
+/* Weather icons and the forecast screens */
+
+// A filled disc.
+static void fill_disc(int cx, int cy, int r, gfx_color_t color)
+{
+    const float rr = ((float)r + 0.5f) * ((float)r + 0.5f);
+    for (int dy = -r; dy <= r; dy++) {
+        const int dx = (int)sqrtf(rr - (float)(dy * dy));
+        gfx_hline(cx - dx, cy + dy, 2 * dx + 1, color);
+    }
+}
+
+// A cloud of three circles on a flat bottom, 27 x 18 px around (cx, cy). grow makes it larger on all sides.
+static void cloud_shape(int cx, int cy, int grow, gfx_color_t color)
+{
+    fill_disc(cx - 7, cy + 2, 5 + grow, color);
+    fill_disc(cx + 1, cy - 2, 8 + grow, color);
+    fill_disc(cx + 8, cy + 2, 5 + grow, color);
+    gfx_fill_rect(cx - 7, cy + 2, 16, 6 + grow, color);
+}
+
+// A white cloud with a black line of 2 px. It covers what is under it (the sun or the moon).
+static void cloud(int cx, int cy)
+{
+    cloud_shape(cx, cy, 2, GFX_BLACK);
+    cloud_shape(cx, cy, 0, GFX_WHITE);
+}
+
+static void sun(int cx, int cy, int r)
+{
+    fill_disc(cx, cy, r, GFX_BLACK);
+    for (int k = 0; k < 8; k++) {
+        const float a = (float)k * 3.14159265f / 4.0f;
+        const float c = cosf(a), s = sinf(a);
+        const int x0 = cx + (int)lroundf(c * (float)(r + 3)), y0 = cy + (int)lroundf(s * (float)(r + 3));
+        const int x1 = cx + (int)lroundf(c * (float)(r + 6)), y1 = cy + (int)lroundf(s * (float)(r + 6));
+        gfx_line(x0, y0, x1, y1, GFX_BLACK);
+        // A second line next to it: the rays are 2 px wide.
+        if (fabsf(s) > 0.5f) {
+            gfx_line(x0 + 1, y0, x1 + 1, y1, GFX_BLACK);
+        } else {
+            gfx_line(x0, y0 + 1, x1, y1 + 1, GFX_BLACK);
+        }
+    }
+}
+
+// A crescent: a black disc, and a white disc over its top right part.
+static void moon(int cx, int cy, int r)
+{
+    fill_disc(cx, cy, r, GFX_BLACK);
+    fill_disc(cx + r * 2 / 3, cy - r / 3, r * 4 / 5, GFX_WHITE);
+}
+
+static void sky_body(int cx, int cy, int r, bool night)
+{
+    if (night) {
+        moon(cx, cy, r + 2);
+    } else {
+        sun(cx, cy, r);
+    }
+}
+
+// The marks of the precipitation, 9 px high from y.
+static void drop(int x, int y)
+{
+    for (int k = 0; k < 3; k++) {
+        gfx_line(x + 3 + k, y, x + k, y + 8, GFX_BLACK);
+    }
+}
+
+static void flake(int x, int y)
+{
+    gfx_fill_rect(x, y, 2, 9, GFX_BLACK);
+    for (int k = 0; k < 2; k++) {
+        gfx_line(x - 3, y + 2 + k, x + 4, y + 6 + k, GFX_BLACK);
+        gfx_line(x - 3, y + 6 + k, x + 4, y + 2 + k, GFX_BLACK);
+    }
+}
+
+static void dot(int x, int y)
+{
+    fill_disc(x, y + 4, 3, GFX_BLACK);
+}
+
+// The FMI SmartSymbol of a weather: 1..99 by day, the same + 100 at night.
+//   1 clear, 2 mostly clear, 4 partly cloudy, 6 mostly cloudy, 7 overcast, 9 fog;
+//   11 drizzle, 14 freezing drizzle, 17 freezing rain;
+//   21..27 showers, 31..39 rain, 41..49 sleet, 51..59 snow, 61..67 hail, 71..77 thunder. In these groups the last
+//   digit gives the cover (1..3 isolated, 4..6 scattered, 7..9 everywhere) and the intensity (1, 4, 7 light;
+//   2, 5, 8 moderate; 3, 6, 9 heavy).
+typedef enum {
+    MARK_NONE = 0,
+    MARK_DROP,
+    MARK_SLEET,
+    MARK_FLAKE,
+    MARK_DOT,
+    MARK_BOLT,
+} mark_t;
+
+// A weather icon, 34 x 34 px around (cx, cy).
+static void weather_icon(int cx, int cy, int symbol)
+{
+    const bool night = symbol > 100;
+    const int b = symbol % 100;
+    if (b <= 0) {
+        return;
+    }
+    if (b == 1) {
+        sky_body(cx, cy, 8, night);
+        return;
+    }
+    if (b == 2 || b == 4) {
+        sky_body(cx - 6, cy - 6, 6, night);
+        cloud(cx + 4, cy + 5);
+        return;
+    }
+    if (b == 6) {
+        sky_body(cx - 8, cy - 8, 5, night);
+        cloud(cx + 2, cy + 3);
+        return;
+    }
+    if (b == 7) {
+        cloud(cx, cy + 2);
+        return;
+    }
+    if (b == 9) {
+        cloud(cx, cy - 5);
+        gfx_fill_rect(cx - 13, cy + 9, 22, 2, GFX_BLACK);
+        gfx_fill_rect(cx - 9, cy + 14, 22, 2, GFX_BLACK);
+        return;
+    }
+
+    mark_t mark = MARK_DROP;
+    int count = 2;
+    bool body = false;              // the sun or the moon behind the cloud: isolated and scattered showers
+    if (b < 20) {
+        mark = b == 11 ? MARK_DOT : MARK_DROP;
+        count = b == 11 ? 3 : 2;
+    } else {
+        const int unit = b % 10, group = b / 10;
+        const int cover = unit >= 1 ? (unit - 1) / 3 : 2;
+        const int intensity = unit >= 1 ? (unit - 1) % 3 : 0;
+        body = cover < 2;
+        switch (group) {
+        case 2:
+            mark = MARK_DROP;
+            break;
+        case 3:
+            mark = MARK_DROP;
+            count = intensity + 1;
+            break;
+        case 4:
+            mark = MARK_SLEET;
+            count = intensity + 2;
+            break;
+        case 5:
+            mark = MARK_FLAKE;
+            count = intensity + 1;
+            break;
+        case 6:
+            mark = MARK_DOT;
+            break;
+        case 7:
+            mark = MARK_BOLT;
+            count = 1;
+            break;
+        default:
+            mark = MARK_NONE;
+            break;
+        }
+    }
+    int ccx = cx;
+    if (body) {
+        sky_body(cx - 7, cy - 11, 5, night);
+        ccx = cx + 3;
+    }
+    cloud(ccx, cy - 5);
+    if (mark == MARK_BOLT) {
+        bolt((float)(ccx - 4), (float)(cy + 5), 9, 12, GFX_BLACK);
+        return;
+    }
+    static const int offsets[3][3] = { { 0 }, { -6, 6 }, { -11, 0, 11 } };
+    if (count > 3) {
+        count = 3;
+    }
+    for (int i = 0; i < count; i++) {
+        const int x = ccx + offsets[count - 1][i], y = cy + 8;
+        switch (mark) {
+        case MARK_DROP:
+            drop(x - 2, y);
+            break;
+        case MARK_FLAKE:
+            flake(x, y);
+            break;
+        case MARK_DOT:
+            dot(x, y);
+            break;
+        case MARK_SLEET:
+            // Drops and flakes in turn.
+            if (i % 2 == 0) {
+                drop(x - 2, y);
+            } else {
+                flake(x, y);
+            }
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+// The weather of an FMI SmartSymbol in words: "хмарно", "місцями невеликий сніг".
+static void weather_text(char *buf, size_t len, int symbol)
+{
+    const int b = symbol % 100;
+    buf[0] = '\0';
+    switch (b) {
+    case 1:
+        strlcpy(buf, tra(T_WEATHER_SKY, 0), len);
+        return;
+    case 2:
+        strlcpy(buf, tra(T_WEATHER_SKY, 1), len);
+        return;
+    case 4:
+        strlcpy(buf, tra(T_WEATHER_SKY, 2), len);
+        return;
+    case 6:
+        strlcpy(buf, tra(T_WEATHER_SKY, 3), len);
+        return;
+    case 7:
+        strlcpy(buf, tra(T_WEATHER_SKY, 4), len);
+        return;
+    case 9:
+        strlcpy(buf, tra(T_WEATHER_SKY, 5), len);
+        return;
+    case 11:
+    case 14:
+    case 17:
+        strlcpy(buf, tra(T_WEATHER_DRIZZLE, (b - 11) / 3), len);
+        return;
+    default:
+        break;
+    }
+    if (b < 21 || b > 79 || b % 10 == 0) {
+        return;
+    }
+    const int unit = b % 10;
+    const int cover = (unit - 1) / 3, intensity = (unit - 1) % 3;
+    const char *base;
+    switch (b / 10) {
+    case 2:
+        base = tr(T_WEATHER_SHOWERS);
+        break;
+    case 3:
+        base = tra(T_WEATHER_RAIN, intensity);
+        break;
+    case 4:
+        base = tra(T_WEATHER_SLEET, intensity);
+        break;
+    case 5:
+        base = tra(T_WEATHER_SNOW, intensity);
+        break;
+    case 6:
+        base = tr(T_WEATHER_HAIL);
+        break;
+    default:
+        base = tr(T_WEATHER_THUNDER);
+        break;
+    }
+    if (cover == 0) {
+        snprintf(buf, len, tr(T_WEATHER_ISOLATED), base);
+    } else if (cover == 1) {
+        snprintf(buf, len, tr(T_WEATHER_SCATTERED), base);
+    } else {
+        strlcpy(buf, base, len);
+    }
+}
+
+// "+1°", "0°", "−4°".
+static void format_degrees(char *buf, size_t len, int t)
+{
+    snprintf(buf, len, "%s%d°", t > 0 ? "+" : (t < 0 ? "−" : ""), abs(t));
+}
+
+// The local date of today + i days (at noon). Return false without the time.
+static bool day_tm(time_t now, int i, struct tm *out)
+{
+    if (!now) {
+        return false;
+    }
+    localtime_r(&now, out);
+    out->tm_mday += i;
+    out->tm_hour = 12;
+    out->tm_min = 0;
+    out->tm_sec = 0;
+    out->tm_isdst = -1;
+    mktime(out);
+    return true;
+}
+
+static bool day_known(const ha_data_t *h, int i)
+{
+    return h && (h->days[i].night.valid || h->days[i].day.valid);
+}
+
+// The icon and the temperature of the night or the day. Without a value: a dash.
+static void day_point(int cx, int icon_cy, int baseline, const gfx_font_t *font, const hadata_point_t *p)
+{
+    char buf[16];
+    if (!p->valid) {
+        gfx_text(font, cx, baseline, GFX_ALIGN_CENTER, GFX_BLACK, "—");
+        return;
+    }
+    weather_icon(cx, icon_cy, p->symbol);
+    format_degrees(buf, sizeof(buf), p->temp);
+    gfx_text(font, cx, baseline, GFX_ALIGN_CENTER, GFX_BLACK, buf);
+}
+
+// "оберіть місто / у налаштуваннях" or "немає прогнозу" in the middle of a box.
+static void no_forecast(const ui_state_t *s, int cx, int cy)
+{
+    if (!s->forecast_city) {
+        gfx_text(&roboto_r14, cx, cy - 2, GFX_ALIGN_CENTER, GFX_BLACK, tr(T_DAYS_NO_CITY));
+        gfx_text(&roboto_r14, cx, cy + 16, GFX_ALIGN_CENTER, GFX_BLACK, tr(T_DAYS_NO_CITY_2));
+    } else {
+        gfx_text(&roboto_r14, cx, cy + 6, GFX_ALIGN_CENTER, GFX_BLACK, tr(T_DAYS_NONE));
+    }
+}
+
+// A panel of the 5-panel screen, 133 x 150 px: the name of the day and its date, the night and the day (icon and
+// temperature, as on meteo.gov.ua) and the weather of the day in words.
+static void forecast_panel(const ui_state_t *s, int i, int x, int w)
+{
+    const int y = GFX_HEIGHT / 2, cx = x + w / 2;
+    const ha_data_t *h = s->ha;
+    char buf[64];
+    struct tm d;
+    if (day_tm(s->now, i, &d)) {
+        const char *title = i == 0 ? tr(T_DAYS_TODAY)
+                                   : (i == 1 ? tr(T_DAYS_TOMORROW) : tra(T_DATE_WEEKDAYS_TITLE, d.tm_wday));
+        gfx_text(fit_font(title, w - 8, 20), cx, y + 22, GFX_ALIGN_CENTER, GFX_BLACK, title);
+        snprintf(buf, sizeof(buf), tr(T_DATE_DAY_MONTH), d.tm_mday, MONTH(&d));
+        gfx_text(&roboto_r13, cx, y + 40, GFX_ALIGN_CENTER, GFX_BLACK, buf);
+    }
+    if (!day_known(h, i)) {
+        no_forecast(s, cx, y + 90);
+        return;
+    }
+    const hadata_day_t *day = &h->days[i];
+    day_point(cx - w / 4, y + 66, y + 110, &roboto_b24, &day->night);
+    day_point(cx + w / 4, y + 66, y + 110, &roboto_b24, &day->day);
+    weather_text(buf, sizeof(buf), day->day.valid ? day->day.symbol : day->night.symbol);
+    note_line_t lines[2];
+    const int n = wrap_note(&roboto_r13, buf, w - 8, lines, 2);
+    for (int k = 0; k < n && k < 2; k++) {
+        gfx_text(&roboto_r13, cx, y + 128 + k * 16, GFX_ALIGN_CENTER, GFX_BLACK, lines[k].text);
+    }
+}
+
+// Five panels: the time and the outdoor air at the top, as on the "4 quadrants" screen; at the bottom the forecast
+// for today, tomorrow and the day after tomorrow.
+static void draw_quad5(const ui_state_t *s, const struct tm *t)
+{
+    quad_time(s, t);
+    quad_air(fresh_ha(s));
+    // A line under the white quadrant, and lines between the panels.
+    gfx_fill_rect(GFX_WIDTH / 2, GFX_HEIGHT / 2, GFX_WIDTH / 2, 2, GFX_BLACK);
+    for (int i = 0; i < 3; i++) {
+        const int x = i * GFX_WIDTH / 3, w = (i + 1) * GFX_WIDTH / 3 - x;
+        if (i > 0) {
+            gfx_fill_rect(x - 1, GFX_HEIGHT / 2 + 10, 2, GFX_HEIGHT / 2 - 20, GFX_BLACK);
+        }
+        forecast_panel(s, i, x, w);
+    }
+    quad_battery(s);
+}
+
+#define CELL 100    // the 10-day screen: 4 x 3 squares of 100 px
+
+// Top left, black: the weekday and the date, the time, and the battery and the state of Wi-Fi.
+static void days_time_cell(const ui_state_t *s, const struct tm *t)
+{
+    char buf[32];
+    gfx_fill_rect(0, 0, CELL, CELL, GFX_BLACK);
+    if (t) {
+        snprintf(buf, sizeof(buf), tr(T_DAYS_SHORT_DATE), tra(T_DATE_WEEKDAYS_SHORT, t->tm_wday), t->tm_mday,
+                 t->tm_mon + 1);
+        gfx_text(fit_font(buf, CELL - 8, 18), CELL / 2, 21, GFX_ALIGN_CENTER, GFX_WHITE, buf);
+        snprintf(buf, sizeof(buf), "%d:%02d", t->tm_hour, t->tm_min);
+        gfx_text(gfx_text_width(&roboto_b40, buf) <= CELL - 6 ? &roboto_b40 : &roboto_b30, CELL / 2, 64,
+                 GFX_ALIGN_CENTER, GFX_WHITE, buf);
+    } else {
+        gfx_text(&roboto_b40, CELL / 2, 64, GFX_ALIGN_CENTER, GFX_WHITE, "—");
+    }
+    // The battery at the bottom left (with a bolt on USB power), its percent; at the right "ЕКО" or a crossed
+    // Wi-Fi icon, as on the "4 quadrants" screen.
+    const int y = 80;
+    int x = 8;
+    if (s->battery_percent >= 0 || s->usb_power) {
+        const int w = 18, hgt = 9;
+        gfx_rect(x, y, w, hgt, 1, GFX_WHITE);
+        gfx_fill_rect(x + w, y + 3, 2, hgt - 6, GFX_WHITE);
+        const int percent = s->battery_percent > 100 ? 100 : s->battery_percent;
+        const int level = percent > 0 ? percent * (w - 4) / 100 : 0;
+        if (level > 0) {
+            gfx_fill_rect(x + 2, y + 2, level, hgt - 4, GFX_WHITE);
+        }
+        x += w + 5;
+        if (s->usb_power) {
+            bolt((float)x, (float)y - 2, 7, 12, GFX_WHITE);
+            x += 10;
+        }
+        if (s->battery_percent >= 0) {
+            snprintf(buf, sizeof(buf), "%d%%", (s->battery_percent + 2) / 5 * 5);
+            gfx_text(&roboto_b14, x, y + 9, GFX_ALIGN_LEFT, GFX_WHITE, buf);
+        }
+    }
+    if (s->eco) {
+        if (s->eco_label) {
+            gfx_text(&roboto_b14, CELL - 6, y + 9, GFX_ALIGN_RIGHT, GFX_WHITE, tr(T_MODE_ECO));
+        }
+    } else if (!s->wifi_connected) {
+        wifi_off_icon(CELL - 15, y + 11, GFX_WHITE, GFX_BLACK);
+    }
+}
+
+// The weather now: the outdoor temperature, the humidity and the AQI.
+static void days_now_cell(const ha_data_t *h, int x, int y)
+{
+    const int cx = x + CELL / 2;
+    char buf[48];
+    gfx_text(&roboto_b15, cx, y + 18, GFX_ALIGN_CENTER, GFX_BLACK, tr(T_DAYS_NOW));
+    if (h && h->temperature.valid) {
+        format_temperature(buf, sizeof(buf), h->temperature.value);
+    } else {
+        strcpy(buf, "—");
+    }
+    gfx_text(fit_font(buf, CELL - 6, 30), cx, y + 54, GFX_ALIGN_CENTER, GFX_BLACK, buf);
+    if (h && h->humidity.valid) {
+        snprintf(buf, sizeof(buf), tr(T_OUTDOOR_HUMIDITY), round(h->humidity.value));
+        gfx_text(&roboto_r13, cx, y + 74, GFX_ALIGN_CENTER, GFX_BLACK, buf);
+    }
+    if (h && h->aqi.valid) {
+        snprintf(buf, sizeof(buf), tr(T_AQI_VALUE), round(h->aqi.value));
+        gfx_text(&roboto_r13, cx, y + 91, GFX_ALIGN_CENTER, GFX_BLACK, buf);
+    }
+}
+
+// A day of the 10-day screen: "Сьогодні", "Завтра" or "Ср, 26.11"; the night and the day under it.
+static void days_cell(const ui_state_t *s, int i, int x, int y)
+{
+    const int cx = x + CELL / 2;
+    const ha_data_t *h = s->ha;
+    char buf[32];
+    struct tm d;
+    if (day_tm(s->now, i, &d)) {
+        const char *title = buf;
+        if (i == 0) {
+            title = tr(T_DAYS_TODAY);
+        } else if (i == 1) {
+            title = tr(T_DAYS_TOMORROW);
+        } else {
+            snprintf(buf, sizeof(buf), tr(T_DAYS_SHORT_DATE), tra(T_DATE_WEEKDAYS_SHORT, d.tm_wday), d.tm_mday,
+                     d.tm_mon + 1);
+        }
+        gfx_text(fit_font(title, CELL - 6, 15), cx, y + 17, GFX_ALIGN_CENTER, GFX_BLACK, title);
+    }
+    if (!day_known(h, i)) {
+        gfx_text(&roboto_b24, cx, y + 66, GFX_ALIGN_CENTER, GFX_BLACK, "—");
+        return;
+    }
+    day_point(cx - 24, y + 45, y + 89, &roboto_b20, &h->days[i].night);
+    day_point(cx + 24, y + 45, y + 89, &roboto_b20, &h->days[i].day);
+}
+
+// 12 squares: the time, the weather now and 10 days of the forecast (the night and the day, as on meteo.gov.ua).
+static void draw_days10(const ui_state_t *s, const struct tm *t)
+{
+    days_time_cell(s, t);
+    days_now_cell(fresh_ha(s), CELL, 0);
+    // Without a forecast the two squares at the top right tell why; the other days show dashes.
+    const bool none = !s->forecast_city || !s->ha || !s->ha->days_at;
+    if (none) {
+        no_forecast(s, 3 * CELL, CELL / 2);
+    }
+    for (int i = 0; i < HADATA_DAYS; i++) {
+        const int n = i + 2;
+        if (none && n < 4) {
+            continue;
+        }
+        days_cell(s, i, (n % 4) * CELL, (n / 4) * CELL);
+    }
+    // The lines between the squares.
+    for (int k = 1; k < 4; k++) {
+        const int top = k == 1 || (k == 3 && none) ? CELL : 0;
+        gfx_vline(k * CELL, top, GFX_HEIGHT - top, GFX_BLACK);
+    }
+    gfx_hline(CELL, CELL, GFX_WIDTH - CELL, GFX_BLACK);
+    gfx_hline(0, 2 * CELL, GFX_WIDTH, GFX_BLACK);
+}
+
 void ui_render(const ui_state_t *s)
 {
     struct tm local;
@@ -1305,6 +1832,10 @@ void ui_render(const ui_state_t *s)
         draw_note(s, t);
     } else if (s->screen == UI_SCREEN_QUAD) {
         draw_quad(s, t);
+    } else if (s->screen == UI_SCREEN_QUAD5) {
+        draw_quad5(s, t);
+    } else if (s->screen == UI_SCREEN_DAYS10) {
+        draw_days10(s, t);
     } else if (s->screen == UI_SCREEN_SERVER) {
         draw_server(s, t);
     } else if (s->screen == UI_SCREEN_CLOCK) {

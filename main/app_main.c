@@ -147,6 +147,7 @@ static void start_ota_check(void)
 #define MODE_LABEL_US       (60 * 1000000LL)   // "ЕКО" stays on the screen after the switch for this time
 #define SERVER_MIN_MINUTES  1       // the sessions of the server screen: every 1 to 30 minutes
 #define SERVER_MAX_MINUTES  30
+#define QUAD5_MINUTES       30      // the sessions of the "5 квадратів" screen
 
 // Commands from Home Assistant (MQTT task) and from the settings page (HTTP task).
 // The main task applies them. -1 = no command.
@@ -333,11 +334,23 @@ static bool clock_active(ui_screen_t screen)
     return screen == UI_SCREEN_CLOCK && !net_ap_active() && !web_ota_active() && !s_ota_pending;
 }
 
-// The "З сервера" screen is the semi-autonomous mode: Wi-Fi and MQTT only every 5 minutes. It waits in
-// the same cases as the clock.
+// The "З сервера" and the "5 квадратів" screens are the semi-autonomous mode: Wi-Fi and MQTT only at the
+// sessions (every 5 and every 30 minutes). Between the sessions the device draws the time each minute.
+static bool session_screen(ui_screen_t screen)
+{
+    return screen == UI_SCREEN_SERVER || screen == UI_SCREEN_QUAD5;
+}
+
+// Minutes between the sessions of a semi-autonomous screen.
+static int session_minutes(ui_screen_t screen)
+{
+    return screen == UI_SCREEN_QUAD5 ? QUAD5_MINUTES : server_minutes();
+}
+
+// A semi-autonomous screen waits in the same cases as the clock.
 static bool server_active(ui_screen_t screen)
 {
-    return screen == UI_SCREEN_SERVER && !net_ap_active() && !web_ota_active() && !s_ota_pending;
+    return session_screen(screen) && !net_ap_active() && !web_ota_active() && !s_ota_pending;
 }
 
 // True while the clock or the server screen keeps Wi-Fi and MQTT off.
@@ -412,6 +425,7 @@ static bool apply_commands(void)
             strlcpy(s_settings.meteo, station, sizeof(s_settings.meteo));
             settings_save_field("meteo", s_settings.meteo);
             hadata_set_station(s_settings.meteo);
+            hass_update_discovery();    // the forecast screens need a city
             changed = true;
         }
     }
@@ -1177,6 +1191,15 @@ static void web_status(char *buf, size_t len)
         srvimg_status(image, sizeof(image));
         LINE(tr(T_STATUS_IMAGE), image[0] ? image : tr(T_STATUS_NOT_YET));
     }
+    if (s->screen == UI_SCREEN_QUAD5 || s->screen == UI_SCREEN_DAYS10) {
+        if (s_last_ha.days_at) {
+            struct tm t;
+            localtime_r(&s_last_ha.days_at, &t);
+            LINE(tr(T_STATUS_DAYS), t.tm_hour, t.tm_min);
+        } else {
+            LINE("%s", tr(T_STATUS_DAYS_NONE));
+        }
+    }
     if (s->room_valid) {
         LINE(tr(T_STATUS_ROOM), (double)s->room_temperature, (double)s->room_humidity);
     }
@@ -1318,12 +1341,13 @@ static void update(ui_screen_t screen, const char *time_source, ui_state_t *stat
 {
     // The screen from trmnl-server has the data: then the device does not read Home Assistant itself.
     const bool server = screen == UI_SCREEN_SERVER && !s_extreme;
+    const bool session = session_screen(screen) && !s_extreme;
     srvimg_set_active(server);
     hadata_pause(server || s_extreme);
     const bool eco = eco_active();
-    // In eco mode and on the server screen the data comes only at the updates: keep it (also the DTEK state)
-    // to the next one.
-    const bool slow = eco || server;
+    // In eco mode and on the semi-autonomous screens the data comes only at the updates: keep it (also the DTEK
+    // state) to the next one.
+    const bool slow = eco || session;
     // "ЕКО" only in the first minute after the switch: then it tells nothing new.
     static bool was_slow;
     static int64_t slow_since;
@@ -1331,7 +1355,7 @@ static void update(ui_screen_t screen, const char *time_source, ui_state_t *stat
         slow_since = esp_timer_get_time();
     }
     was_slow = slow;
-    const int slow_age = (server ? server_minutes() : eco_minutes()) * 60 + HA_MAX_AGE_S;
+    const int slow_age = (session ? session_minutes(screen) : eco_minutes()) * 60 + HA_MAX_AGE_S;
     hadata_set_max_age(slow ? slow_age : HA_MAX_AGE_S, slow ? slow_age : 0);
     hadata_get(ha);
     *state = (ui_state_t){
@@ -1357,6 +1381,7 @@ static void update(ui_screen_t screen, const char *time_source, ui_state_t *stat
         .mqtt_error = hass_last_error(),
         .version = full_version(),
         .message = web_ota_active() ? tr(T_MSG_UPDATING) : NULL,
+        .forecast_city = hadata_city_find(s_settings.meteo) >= 0,
     };
     const time_t now = time(NULL);
     state->now = now >= VALID_TIME ? now : 0;
@@ -1431,6 +1456,15 @@ static bool image_read(void)
     return srvimg_read_count() != s_reads_before;
 }
 
+#define DAYS_WAIT_MS 20000          // a session of the server screen waits for the city forecast (some 300 KB)
+
+static unsigned s_days_before;
+
+static bool days_read(void)
+{
+    return hadata_days_reads() != s_days_before;
+}
+
 // A button event stops the session: the main loop takes it now. Wi-Fi and MQTT go on with the connection.
 static bool session_stopped(void)
 {
@@ -1489,6 +1523,13 @@ static void eco_wake(void)
             hadata_refresh();
             wait_for(data_read, ECO_DATA_WAIT_MS);
         }
+        // The city forecast twice a day also here (hadata reads only it while the requests stop): then the
+        // forecast screens have it at once after the switch.
+        if (hadata_days_due()) {
+            s_days_before = hadata_days_reads();
+            hadata_refresh();
+            wait_for(days_read, DAYS_WAIT_MS);
+        }
     } else {
         s_reads_before = hadata_read_count();
         hadata_refresh();
@@ -1517,7 +1558,7 @@ static bool eco_buttons(uint32_t buttons, ui_screen_t *screen, ui_state_t *state
         const time_t t = time(NULL);
         state->now = t >= VALID_TIME ? t : 0;
         show(state);
-        if (*screen == UI_SCREEN_CLOCK || *screen == UI_SCREEN_SERVER) {
+        if (*screen == UI_SCREEN_CLOCK || session_screen(*screen)) {
             return true;
         }
     }
@@ -1611,9 +1652,9 @@ static uint32_t eco_cycle(ui_screen_t *screen, ui_state_t *state, time_t *next)
     }
 
     *next = time(NULL) + (time_t)eco_minutes() * 60;
-    if ((*screen == UI_SCREEN_CLOCK || *screen == UI_SCREEN_SERVER) && !(result & BOARD_BUTTON_BOOT_3S)) {
-        // KEY showed the clock or the server screen: Wi-Fi and MQTT are off already. The clock keeps them off;
-        // the server screen turns them on in its cycle.
+    if ((*screen == UI_SCREEN_CLOCK || session_screen(*screen)) && !(result & BOARD_BUTTON_BOOT_3S)) {
+        // KEY showed the clock or a semi-autonomous screen: Wi-Fi and MQTT are off already. The clock keeps them
+        // off; a semi-autonomous screen turns them on in its cycle.
         s_offline = true;
         return result;
     }
@@ -1779,10 +1820,10 @@ static uint32_t server_cycle(ui_screen_t *screen, ui_state_t *state, time_t *nex
 {
     const time_t now = time(NULL);
     if (*next == 0 || now >= *next) {
-        *next = now + (time_t)server_minutes() * 60;
+        *next = now + (time_t)session_minutes(*screen) * 60;
         if (s_offline) {
             s_offline = false;
-            ESP_LOGI(TAG, "Server screen: Wi-Fi and MQTT on");
+            ESP_LOGI(TAG, "%s: Wi-Fi and MQTT on", ui_screen_name(*screen));
         }
         eco_wake();
         return 0;
@@ -1913,6 +1954,7 @@ void app_main(void)
     unsigned synced = 0;
     time_t eco_next = 0;
     time_t server_next = 0;
+    ui_screen_t server_screen = UI_SCREEN_COUNT;    // the screen of server_next
     ui_state_t state;
     ha_data_t ha;
     for (;;) {
@@ -1964,6 +2006,11 @@ void app_main(void)
             buttons = clock_cycle(&screen, &state);
         } else if (server) {
             eco_next = 0;
+            // Another semi-autonomous screen (a command of the page or Home Assistant): a session now.
+            if (screen != server_screen) {
+                server_screen = screen;
+                server_next = 0;
+            }
             buttons = server_cycle(&screen, &state, &server_next);
         } else if (eco_active()) {
             server_next = 0;

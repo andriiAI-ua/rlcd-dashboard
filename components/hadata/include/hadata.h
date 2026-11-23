@@ -17,6 +17,20 @@ typedef struct {
     double change;      // value now minus the value of 24 hours ago
 } ha_sensor_t;
 
+// The city forecast of meteo.gov.ua for one date: the night (03:00) and the day (15:00), as on the site.
+typedef struct {
+    bool valid;
+    int temp;                   // °C
+    int symbol;                 // FMI SmartSymbol: 1..99 by day, 101..199 at night (the same weather, dark)
+} hadata_point_t;
+
+typedef struct {
+    hadata_point_t night;
+    hadata_point_t day;
+} hadata_day_t;
+
+#define HADATA_DAYS 10          // from today
+
 typedef struct {
     bool configured;            // the settings have the Home Assistant address and token
     bool ok;                    // the last request succeeded
@@ -55,6 +69,10 @@ typedef struct {
     bool forecast_has_temp;
     int forecast_temp;
     char forecast_text[64];
+
+    // The city forecast of meteo.gov.ua for the 5-panel and the 10-day screens.
+    hadata_day_t days[HADATA_DAYS];
+    time_t days_at;             // the time of the reading, 0 = no forecast
 } ha_data_t;
 
 typedef void (*hadata_change_cb_t)(void);
@@ -82,6 +100,16 @@ int hadata_city_find_name(const char *name);// the index of a city name (current
 
 // Use another meteo.gov.ua station ("" = no forecast) and read its forecast at the next chance.
 void hadata_set_station(const char *station);
+
+// The city forecast (some 300 KB): the device reads it in the background after 06:00 and after 18:00 on all
+// screens (and at once after the start). Then a forecast screen has it at once after the switch.
+
+// Return true if a reading of the city forecast is due. hadata_pause() does not stop this reading: the server
+// screen gets the forecast twice a day too (its session calls hadata_refresh() and waits for the reading).
+bool hadata_days_due(void);
+
+// Return the number of the readings of the city forecast (with or without an answer).
+unsigned hadata_days_reads(void);
 
 // The regions of the alerts of ubilling.net.ua. The device uses them when the Home Assistant alert entities are
 // empty. The names come from the list "alerts.regions" of the language files, in the same order.

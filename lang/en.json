@@ -3,11 +3,13 @@
 
   "date.months": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
   "date.weekdays": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+  "date.weekdays_title": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+  "date.weekdays_short": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
   "date.day_month": "%d %s",
   "date.weekday_day_month": "%s, %d %s",
   "date.day_month_year": "%d %s %d",
 
-  "screen.names": ["Dashboard", "Room", "Note", "4 quadrants", "From server", "Clock"],
+  "screen.names": ["Dashboard", "Room", "Note", "4 quadrants", "5 panels", "10 days", "From server", "Clock"],
 
   "trend.no_change": "no change",
   "trend.no_change_day": "no change in 24 h",
@@ -50,6 +52,25 @@
 
   "forecast.tomorrow": "tomorrow%s · %s",
   "forecast.tomorrow_temp": "tomorrow%s",
+
+  "days.today": "Today",
+  "days.tomorrow": "Tomorrow",
+  "days.now": "Now",
+  "days.short_date": "%s, %d.%02d",
+  "days.none": "no forecast",
+  "days.no_city": "choose the city",
+  "days.no_city_2": "in the settings",
+
+  "weather.sky": ["clear", "mostly clear", "partly cloudy", "mostly cloudy", "overcast", "fog"],
+  "weather.drizzle": ["drizzle", "freezing drizzle", "freezing rain"],
+  "weather.showers": "showers",
+  "weather.rain": ["light rain", "rain", "heavy rain"],
+  "weather.sleet": ["light sleet", "sleet", "heavy sleet"],
+  "weather.snow": ["light snow", "snow", "heavy snow"],
+  "weather.hail": "hail",
+  "weather.thunder": "thunderstorm",
+  "weather.isolated": "isolated %s",
+  "weather.scattered": "scattered %s",
 
   "time.not_set": "No time",
   "time.not_set_short": "no time",
@@ -133,7 +154,7 @@
   "page.password_set": "set; empty — no change",
   "page.password_unset": "not set",
   "page.no_password": "no password",
-  "page.screen_about": ["weather and air outdoors, alerts, power — from Home Assistant", "clock, room temperature and humidity, weather outdoors", "your text from the field below", "large font: date and time, weather and AQI, alert, power", "4 quadrants from trmnl-server; a connection every 5 min, the device draws the date and time", "offline: date, time, room temperature and humidity, battery; Wi-Fi is off"],
+  "page.screen_about": ["weather and air outdoors, alerts, power — from Home Assistant", "clock, room temperature and humidity, weather outdoors", "your text from the field below", "large font: date and time, weather and AQI, alert, power", "date and time, weather and AQI, the forecast for today, tomorrow and the day after (meteo.gov.ua, twice a day); a connection every 30 min", "date and time, the weather now and the 10-day forecast (meteo.gov.ua, updated twice a day)", "4 quadrants from trmnl-server; a connection every 5 min, the device draws the date and time", "offline: date, time, room temperature and humidity, battery; Wi-Fi is off"],
   "page.sounds": ["Siren", "Warning tone", "Short beeps", "All-clear melody", "Own file", "No sound"],
   "page.events": ["Missile alert", "Drone alert", "All clear"],
   "page.sound_legend": "Alert sound",
@@ -273,6 +294,7 @@
 
   "js.locale": "en-GB",
   "js.warn_server": "«From server» is the semi-offline mode: Wi-Fi is on every 5 min for some seconds, between the sessions the page does not open. Change the mode with the buttons on the device: KEY — next screen, BOOT — Wi-Fi for 2 min. Change?",
+  "js.warn_quad5": "«5 panels» is the semi-offline mode: Wi-Fi is on every 30 min for some seconds, between the sessions the page does not open. Change the mode with the buttons on the device: KEY — next screen, BOOT — Wi-Fi for 2 min. Change?",
   "js.warn_clock": "«Clock» is the offline mode: Wi-Fi goes off, and the page does not open. Change the mode with the buttons on the device: KEY — next screen. Change?",
   "js.state_clock": "The device seems to be offline («Clock»). Change the mode with the buttons on the device: KEY — next screen.",
   "js.state_server": "The device seems to be offline («From server»: a connection every 5 min). Change the mode with the buttons on the device: KEY — next screen, BOOT — Wi-Fi for 2 min.",
@@ -430,6 +452,8 @@
   "status.time_not_set": "Time: not set",
   "status.ntp": "Last time synchronization: %02d.%02d %02d:%02d",
   "status.ntp_never": "Last time synchronization: none yet",
+  "status.days": "Forecast by days (meteo.gov.ua): read at %02d:%02d",
+  "status.days_none": "Forecast by days (meteo.gov.ua): not read yet",
   "status.ha": "Home Assistant: %s",
   "status.forecast": "Forecast for tomorrow: %s",
   "status.dtek_ha": "  Grid: %s — HA entity",

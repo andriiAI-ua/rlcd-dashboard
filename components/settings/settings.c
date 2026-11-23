@@ -178,5 +178,8 @@ bool settings_screen_available(const settings_t *s, const char *id)
     if (strcmp(id, "server") == 0) {
         return s->has_srv[0] != '0';
     }
+    if (strcmp(id, "quad5") == 0 || strcmp(id, "days10") == 0) {
+        return s->meteo[0] != '\0';
+    }
     return true;
 }

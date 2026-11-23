@@ -21,6 +21,8 @@ typedef enum {
     UI_SCREEN_ROOM,
     UI_SCREEN_NOTE,         // a text from the settings page
     UI_SCREEN_QUAD,         // four quadrants: time, outdoor air, alert, power
+    UI_SCREEN_QUAD5,        // time, outdoor air, the forecast for 3 days; the data each 30 minutes
+    UI_SCREEN_DAYS10,       // time, the weather now and the forecast for 10 days
     UI_SCREEN_SERVER,       // four quadrants from trmnl-server, the time quadrant from the device
     UI_SCREEN_CLOCK,        // the autonomous mode: no Wi-Fi, no MQTT, no Home Assistant data
     UI_SCREEN_COUNT,
@@ -54,6 +56,7 @@ typedef struct {
     const char *ap_password;
     const char *ap_ip;
     const char *message;        // a message over the screen (for example, a reset), or NULL
+    bool forecast_city;         // the settings have a city of the forecast (the forecast screens)
 
     // Only for the settings page (the screen does not show them).
     const char *time_source;    // "NTP", "DS3231", "PCF85063" or NULL
@@ -64,7 +67,8 @@ typedef struct {
     const char *version;        // firmware version
 } ui_state_t;
 
-// Return the screen id for the settings ("dashboard", "room", "note", "quad", "server", "clock").
+// Return the screen id for the settings ("dashboard", "room", "note", "quad", "quad5", "days10", "server",
+// "clock").
 const char *ui_screen_id(ui_screen_t screen);
 
 // Return the screen for a settings id. An unknown id gives the dashboard.

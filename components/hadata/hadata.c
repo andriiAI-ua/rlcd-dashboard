@@ -1,7 +1,8 @@
 // Reads the dashboard data:
 // - Home Assistant: one POST /api/template a minute gives all entities (state, times, unit) at once;
 // - Home Assistant history: the values of 24 hours ago, one entity a minute, kept for 15 minutes;
-// - meteo.gov.ua: the forecast informer, once an hour.
+// - meteo.gov.ua: the forecast informer, once an hour; the city forecast (fmi.json, the data of the forecast
+//   page of the site) twice a day.
 // The logic and the intervals are the same as in trmnl-server (DashboardDataService, HomeAssistantClient,
 // MeteoForecastClient).
 #include "hadata.h"
@@ -26,6 +27,7 @@
 #include "net.h"
 #include "ping/ping_sock.h"
 #include "time_util.h"
+#include "fmi_parse.h"
 
 static const char *TAG = "hadata";
 
@@ -47,6 +49,13 @@ static const char *TAG = "hadata";
 #define WEATHER_MAX_AGE_S   (3 * 60 * 60)   // an older observation is not shown
 #define FORECAST_RETRY_S    (15 * 60)
 #define FORECAST_MAX_AGE_S  (12 * 60 * 60)
+
+// The city forecast: after 06:00 and after 18:00 on all screens.
+#define DAYS_RETRY_S        (10 * 60)
+#define DAYS_MAX_AGE_S      (36 * 60 * 60)  // the forecast of the dates stays useful
+#define DAYS_MORNING_HOUR   6
+#define DAYS_EVENING_HOUR   18
+#define DAYS_URL_LEN        448
 
 // healthchecks.io: an HTTPS request costs more energy than a request to Home Assistant on the home
 // network, and the UPS status already tells about a power loss at once. So read the check less often.
@@ -124,6 +133,12 @@ static int s_dayago_count;
 
 static forecast_day_t s_days[6];
 static int s_day_count;
+// The city forecast for the 5-panel and the 10-day screens.
+static fmi_day_t s_fmi_days[FMI_DAYS];
+static time_t s_fmi_at;
+static time_t s_fmi_next;
+static fmi_parser_t s_fmi_parser;
+static volatile unsigned s_days_reads;
 static time_t s_forecast_at;
 // The current weather of the informer: the temperature, the humidity (-1 = none) and the observation time.
 static bool s_now_valid;
@@ -903,6 +918,22 @@ static const char *const CITY_STATIONS[] = { "33562", "34504", "33325", "34602",
 _Static_assert(sizeof(CITY_STATIONS) / sizeof(CITY_STATIONS[0]) == T_METEO_CITIES_ITEMS,
                "lang: meteo.cities must have one name per station of CITY_STATIONS");
 
+// The city and the region of each station for the forecast page of the site (fmi.json), in the order of
+// CITY_STATIONS. The site finds the place by these Ukrainian names in each language.
+static const char *const CITY_PLACES[][2] = {
+    { "Вінниця", "Вінницька" }, { "Дніпро", "Дніпропетровська" }, { "Житомир", "Житомирська" },
+    { "Запоріжжя", "Запорізька" }, { "Івано-Франківськ", "Івано-Франківська" }, { "Київ", "Київська" },
+    { "Кропивницький", "Кіровоградська" }, { "Луцьк", "Волинська" }, { "Львів", "Львівська" },
+    { "Миколаїв", "Миколаївська" }, { "Одеса", "Одеська" }, { "Первомайськ", "Миколаївська" },
+    { "Полтава", "Полтавська" }, { "Рівне", "Рівненська" }, { "Сімферополь", "Автономна Республіка Крим" },
+    { "Суми", "Сумська" }, { "Тернопіль", "Тернопільська" }, { "Ужгород", "Закарпатська" },
+    { "Умань", "Черкаська" }, { "Харків", "Харківська" }, { "Херсон", "Херсонська" },
+    { "Хмельницький", "Хмельницька" }, { "Черкаси", "Черкаська" }, { "Чернівці", "Чернівецька" },
+    { "Чернігів", "Чернігівська" },
+};
+_Static_assert(sizeof(CITY_PLACES) / sizeof(CITY_PLACES[0]) == sizeof(CITY_STATIONS) / sizeof(CITY_STATIONS[0]),
+               "CITY_PLACES must have one place per station of CITY_STATIONS");
+
 int hadata_city_count(void)
 {
     return (int)(sizeof(CITY_STATIONS) / sizeof(CITY_STATIONS[0]));
@@ -1021,6 +1052,116 @@ static void read_forecast(time_t now)
     // The current weather replaces a missing outdoor entity of Home Assistant: then read it more often.
     s_forecast_next = now + (s_temp.count == 0 || s_hum.count == 0 ? WEATHER_REFRESH_S : FORECAST_REFRESH_S);
     ESP_LOGI(TAG, "%d forecast days from meteo.gov.ua, now %s%d°", count, current ? "" : "(none) ", temp);
+}
+
+/* The city forecast of meteo.gov.ua */
+
+static esp_err_t on_days_event(esp_http_client_event_t *e)
+{
+    if (e->event_id == HTTP_EVENT_ON_DATA) {
+        fmi_parser_feed(&s_fmi_parser, e->data, (size_t)e->data_len);
+    }
+    return ESP_OK;
+}
+
+// Percent-encode a UTF-8 text for a URL query.
+static void url_encode(char *out, size_t cap, const char *in)
+{
+    static const char hex[] = "0123456789ABCDEF";
+    size_t o = 0;
+    for (const unsigned char *p = (const unsigned char *)in; *p && o + 4 < cap; p++) {
+        if (isalnum(*p) || *p == '-' || *p == '_' || *p == '.' || *p == '~') {
+            out[o++] = (char)*p;
+        } else {
+            out[o++] = '%';
+            out[o++] = hex[*p >> 4];
+            out[o++] = hex[*p & 0x0F];
+        }
+    }
+    out[o] = '\0';
+}
+
+// Return true if the city forecast must be read now.
+static bool days_due(time_t now)
+{
+    if (now < s_fmi_next) {
+        return false;
+    }
+    if (s_fmi_at == 0) {
+        return true;
+    }
+    // The last reading must be after the last 06:00 or 18:00.
+    struct tm t;
+    localtime_r(&now, &t);
+    if (t.tm_hour >= DAYS_EVENING_HOUR) {
+        t.tm_hour = DAYS_EVENING_HOUR;
+    } else if (t.tm_hour >= DAYS_MORNING_HOUR) {
+        t.tm_hour = DAYS_MORNING_HOUR;
+    } else {
+        t.tm_mday--;
+        t.tm_hour = DAYS_EVENING_HOUR;
+    }
+    t.tm_min = 0;
+    t.tm_sec = 0;
+    t.tm_isdst = -1;
+    return s_fmi_at < mktime(&t);
+}
+
+// Read the forecast of the city from the forecast page of the site. The answer streams through the parser.
+static void read_days(time_t now)
+{
+    char station[sizeof(s_station)];
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    strlcpy(station, s_station, sizeof(station));
+    xSemaphoreGive(s_lock);
+    const int i = hadata_city_find(station);
+    if (i < 0) {
+        s_fmi_next = now + DAYS_RETRY_S;
+        s_days_reads++;
+        return;
+    }
+    char city[96], region[192], url[DAYS_URL_LEN];
+    url_encode(city, sizeof(city), CITY_PLACES[i][0]);
+    url_encode(region, sizeof(region), CITY_PLACES[i][1]);
+    snprintf(url, sizeof(url), "https://www.meteo.gov.ua/fmi.json?city=%s&region=%s&lang=ua&action=getCityWeather",
+             city, region);
+    struct tm t;
+    localtime_r(&now, &t);
+    fmi_parser_init(&s_fmi_parser, t.tm_year + 1900, t.tm_mon + 1, t.tm_mday);
+
+    esp_http_client_config_t cfg = {
+        .url = url,
+        .method = HTTP_METHOD_GET,
+        .timeout_ms = 15000,
+        .event_handler = on_days_event,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+        .buffer_size = 4096,
+        .buffer_size_tx = 1024,
+    };
+    esp_http_client_handle_t c = esp_http_client_init(&cfg);
+    if (!c) {
+        s_fmi_next = now + DAYS_RETRY_S;
+        s_days_reads++;
+        return;
+    }
+    const esp_err_t err = esp_http_client_perform(c);
+    const int status = err == ESP_OK ? esp_http_client_get_status_code(c) : -1;
+    esp_http_client_cleanup(c);
+    const int count = status == 200 ? fmi_parser_count(&s_fmi_parser) : 0;
+    s_days_reads++;
+    if (count == 0) {
+        ESP_LOGW(TAG, "No city forecast from meteo.gov.ua (HTTP %d, %s)", status, esp_err_to_name(err));
+        s_fmi_next = now + DAYS_RETRY_S;
+        return;
+    }
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    if (strcmp(station, s_station) == 0) {
+        memcpy(s_fmi_days, s_fmi_parser.days, sizeof(s_fmi_days));
+        s_fmi_at = now;
+    }
+    xSemaphoreGive(s_lock);
+    s_fmi_next = 0;
+    ESP_LOGI(TAG, "City forecast from meteo.gov.ua: %d days", count);
 }
 
 /* healthchecks.io */
@@ -1257,6 +1398,16 @@ static void read_tz(void)
 
 static volatile bool s_paused;
 
+bool hadata_days_due(void)
+{
+    return s_station[0] && hadata_city_find(s_station) >= 0 && days_due(time(NULL));
+}
+
+unsigned hadata_days_reads(void)
+{
+    return s_days_reads;
+}
+
 void hadata_pause(bool paused)
 {
     if (s_paused == paused) {
@@ -1286,7 +1437,16 @@ static void hadata_task(void *arg)
                 s_on_change();
             }
         }
-        const bool online = !s_paused && net_connected() && now >= VALID_TIME;
+        const bool connected = net_connected() && now >= VALID_TIME;
+        const bool online = !s_paused && connected;
+        if (s_paused && connected && s_station[0] && days_due(now)) {
+            // The server screen stops the other requests. The city forecast still comes twice a day: then
+            // the forecast screens have it at once after the switch.
+            read_days(now);
+            if (s_on_change) {
+                s_on_change();
+            }
+        }
         if (online) {
             if (configured) {
                 read_states(now);
@@ -1301,6 +1461,9 @@ static void hadata_task(void *arg)
             }
             if (s_station[0] && now >= s_forecast_next) {
                 read_forecast(now);
+            }
+            if (s_station[0] && days_due(now)) {
+                read_days(now);
             }
             // The ping is the last source: only when the entity and the check tell nothing.
             if (s_ping_host[0] && !dtek_known_without_ping(now)) {
@@ -1434,6 +1597,8 @@ void hadata_set_station(const char *station)
     s_day_count = 0;            // the forecast of the old city is not shown
     s_now_valid = false;
     s_forecast_next = 0;        // read the new one at the next chance
+    s_fmi_at = 0;
+    s_fmi_next = 0;
     xSemaphoreGive(s_lock);
     ESP_LOGI(TAG, "Forecast: station \"%s\"", s_station);
     if (s_task) {
@@ -1503,9 +1668,32 @@ void hadata_get(ha_data_t *out)
             }
         }
     }
+    // The city forecast by dates: days[0] is today. After midnight the dates move without a new reading.
+    memset(out->days, 0, sizeof(out->days));
+    out->days_at = 0;
+    if (s_fmi_at && now - s_fmi_at <= DAYS_MAX_AGE_S) {
+        struct tm t;
+        localtime_r(&now, &t);
+        for (int i = 0; i < HADATA_DAYS; i++) {
+            struct tm d = t;
+            d.tm_mday += i;
+            d.tm_hour = 12;
+            d.tm_isdst = -1;
+            mktime(&d);
+            for (int k = 0; k < FMI_DAYS; k++) {
+                const fmi_day_t *f = &s_fmi_days[k];
+                if (f->year == d.tm_year + 1900 && f->month == d.tm_mon + 1 && f->mday == d.tm_mday) {
+                    out->days[i].night = (hadata_point_t){ f->night.valid, f->night.temp, f->night.symbol };
+                    out->days[i].day = (hadata_point_t){ f->day.valid, f->day.temp, f->day.symbol };
+                    break;
+                }
+            }
+        }
+        out->days_at = s_fmi_at;
+    }
     // Without Home Assistant the screens take the data as fresh when a source has fresh data: each source
     // checks the age of its own data above.
-    if (!out->configured && (out->outdoor_meteo || out->forecast_valid || out->alert_known)) {
+    if (!out->configured && (out->outdoor_meteo || out->forecast_valid || out->alert_known || out->days_at)) {
         out->updated = now;
     }
     xSemaphoreGive(s_lock);

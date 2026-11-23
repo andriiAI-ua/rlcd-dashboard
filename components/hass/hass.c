@@ -41,7 +41,8 @@ static char s_error[64];
 static const settings_t *s_settings;    // the screens that are available (settings_screen_available())
 
 // The screen ids in the order of the list screen.names (ui_screen_t).
-static const char *const SCREEN_IDS[] = { "dashboard", "room", "note", "quad", "server", "clock" };
+static const char *const SCREEN_IDS[] = { "dashboard", "room", "note", "quad", "quad5", "days10", "server",
+                                          "clock" };
 _Static_assert(sizeof(SCREEN_IDS) / sizeof(SCREEN_IDS[0]) == T_SCREEN_NAMES_ITEMS, "lang: screen.names");
 
 typedef struct {
@@ -396,6 +397,13 @@ void hass_set_command(const char *key, const char *value)
             }
             return;
         }
+    }
+}
+
+void hass_update_discovery(void)
+{
+    if (s_client && s_connected) {
+        publish_discovery();
     }
 }
 

@@ -46,6 +46,10 @@ void hass_set_state(const char *key, const char *value);
 // Without a connection the value waits for the next one.
 void hass_set_command(const char *key, const char *value);
 
+// Publish the entity configurations again: the options of the screen select change with the settings (the city
+// of the forecast). Without a connection the next connection publishes them.
+void hass_update_discovery(void);
+
 // Disconnect before Wi-Fi goes off, and connect again after Wi-Fi is on.
 // A clean disconnection keeps the entities available in Home Assistant.
 void hass_suspend(void);

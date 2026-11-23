@@ -357,7 +357,7 @@ typedef struct {
 // In the order of ui_screen_t: the names are the list screen.names, the notes page.screen_about.
 static const screen_t SCREENS[] = {
     { "dashboard", NULL }, { "room", NULL }, { "note", NULL }, { "quad", NULL },
-    { "server", "L.warn_server" }, { "clock", "L.warn_clock" },
+    { "quad5", "L.warn_quad5" }, { "days10", NULL }, { "server", "L.warn_server" }, { "clock", "L.warn_clock" },
 };
 _Static_assert(sizeof(SCREENS) / sizeof(SCREENS[0]) == T_SCREEN_NAMES_ITEMS, "lang: screen.names");
 _Static_assert(sizeof(SCREENS) / sizeof(SCREENS[0]) == T_PAGE_SCREEN_ABOUT_ITEMS, "lang: page.screen_about");

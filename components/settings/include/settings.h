@@ -46,7 +46,8 @@ typedef struct {
     char srv_url[128];      // the image of the "server" screen (trmnl-server, a 400 x 300 1-bit BMP)
     char srv_min[12];       // minutes between the sessions of the "server" screen, 1..30
 
-    char screen[16];        // the screen after the start: "dashboard", "room", "note", "quad", "server", "clock"
+    char screen[16];        // the screen after the start: "dashboard", "room", "note", "quad", "quad5", "days10",
+                            // "server", "clock"
     char note[512];         // the text of the "note" screen (UTF-8, lines with '\n')
     char scr_back[16];      // the screen before the low-battery clock, "" = none (USB power gives it back)
 
@@ -91,7 +92,8 @@ esp_err_t settings_reset(void);
 esp_err_t settings_save_field(const char *key, const char *value);
 
 // Return false for a screen (its id, for example "dashboard") that needs a service the user does not have:
-// "dashboard" and "quad" need Home Assistant, "server" needs trmnl-server.
+// "dashboard" and "quad" need Home Assistant, "server" needs trmnl-server, "quad5" and "days10" need a city of
+// the forecast.
 bool settings_screen_available(const settings_t *s, const char *id);
 
 #ifdef __cplusplus
