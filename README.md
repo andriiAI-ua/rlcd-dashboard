@@ -252,7 +252,7 @@ The "From server" screen is in the KEY cycle after "4 quadrants" and a button on
 
 The "Clock" screen is in the KEY cycle after "From server" and a button on the settings page (the page asks first: Wi-Fi goes off).
 
-- While it is on the screen, Wi-Fi and MQTT are off, there are no Home Assistant requests and no alert sound. The time comes from the processor clock and the clock chip (PCF85063 or DS3231): without Wi-Fi NTP does not correct it.
+- While it is on the screen, Wi-Fi and MQTT are off, there are no Home Assistant requests and no alert sound. The time comes from the clock chip (PCF85063 or DS3231): each minute the firmware compares the processor clock with it, because in sleep the processor clock is not accurate. Without Wi-Fi NTP does not correct the time.
 - The device sleeps (light sleep) and wakes up once a minute to update the time, the temperature, the humidity and the battery. This saves more than eco mode: Wi-Fi does not come on at all. When eco mode is on, the clock has priority.
 - KEY: the next screen. It shows the last data at once, then the device turns Wi-Fi and MQTT on, gets the Home Assistant data and draws the screen again. The buttons do not wait for this session: a press stops the waits for Wi-Fi, the image and the data (Wi-Fi goes on connecting in the background), and KEY changes the screen at once. The same during a session on "From server" and in eco mode. A short BOOT press updates the clock now and keeps the device awake for 30 s (so that a computer on USB sees the device); BOOT 3 s: Wi-Fi and the access point (while it is on, the clock waits); BOOT 10 s: reset of the settings.
 - The screen choice is kept: after a restart the device stays offline.
@@ -286,7 +286,7 @@ The pins come from the schematic of the board (`ESP32-S3-RLCD-4.2-schematic.pdf`
 | SDA | SDA (GPIO13) | green |
 | SCL | SCL (GPIO14) | yellow |
 
-The firmware looks for DS3231 (`0x68`) at the start. When it is there, the time comes from it, else from PCF85063. After an NTP synchronization the time goes to the clock. On a ZS-042 module, remove the charging diode (a CR2032 cell must not charge) and the power LED (1–3 mA).
+The firmware looks for DS3231 (`0x68`) at the start. When it is there, the time comes from it, else from PCF85063. After each Wi-Fi connection the firmware asks NTP for the time and writes it to the clock, correct to some milliseconds. Between the synchronizations the processor clock follows the chip: in sleep it runs from the internal RC oscillator, which is not accurate. The status page shows the time of the last synchronization. The cell is necessary only while the board has no power at all. On a ZS-042 module, remove the charging diode (a CR2032 cell must not charge) and the power LED (1–3 mA).
 
 **Power.** With USB the board runs from USB, and the battery only charges and stays in reserve (an "ideal diode" on Q3/Q4/Q6). The 3.3 V converter (TPS63020) works in forced PWM, so the board takes ~60 mW also in sleep: an 18650 cell lasts some days.
 

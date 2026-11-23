@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <time.h>
 #include "settings.h"
 
 #ifdef __cplusplus
@@ -59,6 +60,9 @@ int net_last_reason(void);
 
 // Return the number of time synchronizations since the start.
 unsigned net_sync_count(void);
+
+// Return the time of the last time synchronization, or 0.
+time_t net_sync_time(void);
 
 #ifdef __cplusplus
 }

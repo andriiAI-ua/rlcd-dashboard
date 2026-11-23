@@ -428,6 +428,8 @@
   "status.time": "Time: %02d.%02d.%04d %02d:%02d, source: %s",
   "status.unknown": "not known",
   "status.time_not_set": "Time: not set",
+  "status.ntp": "Last time synchronization: %02d.%02d %02d:%02d",
+  "status.ntp_never": "Last time synchronization: none yet",
   "status.ha": "Home Assistant: %s",
   "status.forecast": "Forecast for tomorrow: %s",
   "status.dtek_ha": "  Grid: %s — HA entity",

@@ -428,6 +428,8 @@
   "status.time": "Час: %02d.%02d.%04d %02d:%02d, джерело: %s",
   "status.unknown": "невідоме",
   "status.time_not_set": "Час: не задано",
+  "status.ntp": "Остання синхронізація часу: %02d.%02d %02d:%02d",
+  "status.ntp_never": "Остання синхронізація часу: ще не було",
   "status.ha": "Home Assistant: %s",
   "status.forecast": "Прогноз на завтра: %s",
   "status.dtek_ha": "  ДТЕК: %s — сутність HA",

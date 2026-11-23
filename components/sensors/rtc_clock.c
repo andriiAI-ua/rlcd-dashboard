@@ -2,8 +2,13 @@
 #include "rtc_clock.h"
 
 #include <stdbool.h>
+#include <sys/time.h>
 #include "esp_check.h"
 #include "esp_log.h"
+#include "esp_rom_sys.h"
+#include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "time_util.h"
 
 static const char *TAG = "rtc";
@@ -16,6 +21,14 @@ static const char *TAG = "rtc";
 // A clock with a year before this one did not keep the time.
 #define MIN_VALID_YEAR    2024
 
+// rtc_clock_read_edge(): the longest wait for the next chip second.
+#define EDGE_TIMEOUT_US   1200000
+// PCF85063A: after STOP is cleared, the first second ends 0.507813 to 0.507935 s later (the prescaler
+// stages F0 and F1 are not reset).
+#define PCF85063_START_US 507874
+// The time for the I2C writes before the chip starts.
+#define WRITE_MARGIN_US   20000
+
 static rtc_clock_kind_t s_kind = RTC_CLOCK_NONE;
 static i2c_master_dev_handle_t s_dev;
 
@@ -25,6 +38,32 @@ static uint8_t bin_to_bcd(int v) { return (uint8_t)(((v / 10) << 4) | (v % 10));
 static time_t to_epoch(int year, int month, int day, int hour, int minute, int second)
 {
     return time_utc(year, month, day, hour, minute, second);
+}
+
+// Return the system time in microseconds since 1970.
+static int64_t system_us(void)
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (int64_t)tv.tv_sec * 1000000 + tv.tv_usec;
+}
+
+// Wait until the system time is at target_us. A task delay gives most of the wait, a short busy wait the end.
+static void wait_until(int64_t target_us)
+{
+    const int64_t tick_us = 1000000 / configTICK_RATE_HZ;
+    for (;;) {
+        const int64_t left = target_us - system_us();
+        if (left <= 0) {
+            return;
+        }
+        if (left > 3 * tick_us) {
+            // A delay of n ticks is n - 1 to n ticks long: it stops before the target.
+            vTaskDelay((TickType_t)(left / tick_us - 2));
+        } else {
+            esp_rom_delay_us((uint32_t)left);
+        }
+    }
 }
 
 static esp_err_t read_regs(uint8_t reg, uint8_t *buf, size_t len)
@@ -116,6 +155,18 @@ static esp_err_t ds3231_write(const struct tm *t)
     return write_regs(0x0F, &status, 1);
 }
 
+// The DS3231 resets its countdown chain when the seconds register is written: write the time at the start
+// of the next system second.
+static esp_err_t ds3231_write_now(void)
+{
+    const int64_t start_us = (system_us() / 1000000 + 1) * 1000000;
+    const time_t utc = (time_t)(start_us / 1000000);
+    struct tm t;
+    gmtime_r(&utc, &t);
+    wait_until(start_us);
+    return ds3231_write(&t);
+}
+
 /* PCF85063A */
 
 static esp_err_t pcf85063_setup(void)
@@ -156,6 +207,29 @@ static esp_err_t pcf85063_write(const struct tm *t)
         bin_to_bcd(t->tm_year % 100),
     };
     return write_regs(0x04, r, sizeof(r));
+}
+
+// STOP (bit 5 of Control_1) holds the prescaler in reset. Set STOP, write the time of the current second,
+// and clear STOP PCF85063_START_US before the next system second: then the chip second ends with it.
+static esp_err_t pcf85063_write_now(void)
+{
+    uint8_t ctrl;
+    ESP_RETURN_ON_ERROR(read_regs(0x00, &ctrl, 1), TAG, "PCF85063 control");
+    int64_t start_us = (system_us() / 1000000 + 1) * 1000000;
+    if (start_us - PCF85063_START_US - system_us() < WRITE_MARGIN_US) {
+        start_us += 1000000;
+    }
+    const time_t utc = (time_t)(start_us / 1000000 - 1);
+    struct tm t;
+    gmtime_r(&utc, &t);
+    const uint8_t stop = ctrl | 0x20;
+    ESP_RETURN_ON_ERROR(write_regs(0x00, &stop, 1), TAG, "PCF85063 stop");
+    const esp_err_t err = pcf85063_write(&t);
+    wait_until(start_us - PCF85063_START_US);
+    // Clear STOP also after an error: the clock must run.
+    const uint8_t run = ctrl & (uint8_t)~0x20;
+    const esp_err_t run_err = write_regs(0x00, &run, 1);
+    return err != ESP_OK ? err : run_err;
 }
 
 /* Public interface */
@@ -207,15 +281,36 @@ esp_err_t rtc_clock_read(time_t *utc)
     }
 }
 
-esp_err_t rtc_clock_write(time_t utc)
+esp_err_t rtc_clock_read_edge(time_t *utc)
 {
-    struct tm t;
-    gmtime_r(&utc, &t);
+    time_t first;
+    esp_err_t err = rtc_clock_read(&first);
+    if (err != ESP_OK) {
+        return err;
+    }
+    const int64_t until = esp_timer_get_time() + EDGE_TIMEOUT_US;
+    while (esp_timer_get_time() < until) {
+        vTaskDelay(1);
+        time_t t;
+        err = rtc_clock_read(&t);
+        if (err != ESP_OK) {
+            return err;
+        }
+        if (t != first) {
+            *utc = t;
+            return ESP_OK;
+        }
+    }
+    return ESP_ERR_TIMEOUT;
+}
+
+esp_err_t rtc_clock_write_now(void)
+{
     switch (s_kind) {
     case RTC_CLOCK_DS3231:
-        return ds3231_write(&t);
+        return ds3231_write_now();
     case RTC_CLOCK_PCF85063:
-        return pcf85063_write(&t);
+        return pcf85063_write_now();
     default:
         return ESP_ERR_NOT_FOUND;
     }

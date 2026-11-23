@@ -28,8 +28,13 @@ const char *rtc_clock_name(void);
 // (no backup battery, or the time was never set).
 esp_err_t rtc_clock_read(time_t *utc);
 
-// Write the UTC time.
-esp_err_t rtc_clock_write(time_t utc);
+// Read the UTC time at the start of the next chip second: then the time is correct to some milliseconds.
+// The function waits up to 1.2 s. Return ESP_ERR_TIMEOUT if the seconds do not change.
+esp_err_t rtc_clock_read_edge(time_t *utc);
+
+// Write the system time to the chip. The chip second then starts with the system second. The function
+// waits up to 1 s.
+esp_err_t rtc_clock_write_now(void);
 
 #ifdef __cplusplus
 }

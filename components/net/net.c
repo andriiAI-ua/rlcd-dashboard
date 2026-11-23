@@ -56,7 +56,7 @@ static volatile int s_ap_clients;
 static volatile int64_t s_ap_idle_since;
 static volatile int s_last_reason;
 static volatile unsigned s_sync_count;
-static bool s_sntp_started;
+static volatile time_t s_sync_at;
 static char s_ssid[33];
 static volatile bool s_suspended;   // Wi-Fi is off (eco mode)
 static volatile bool s_auto_ap = true;
@@ -93,7 +93,7 @@ static void apply_dns(void)
 
 static void on_time_sync(struct timeval *tv)
 {
-    (void)tv;
+    s_sync_at = tv->tv_sec;
     s_sync_count++;
     ESP_LOGI(TAG, "Time is synchronized");
     notify();
@@ -127,9 +127,9 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
         s_connected = true;
         s_last_reason = 0;
         apply_dns();
-        if (!s_sntp_started) {
-            s_sntp_started = esp_netif_sntp_start() == ESP_OK;
-        }
+        // Ask for the network time at each connection. In eco mode Wi-Fi is off between the sessions, and
+        // the periodic SNTP request (each hour) usually comes while Wi-Fi is off.
+        esp_netif_sntp_start();
         xEventGroupSetBits(s_events, BIT_GOT_IP);
         notify();
     }
@@ -384,7 +384,7 @@ void net_start(const settings_t *settings, const char *ntp_server, net_change_cb
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, on_event, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, on_event, NULL));
 
-    // SNTP starts after the first IP address (see on_event).
+    // SNTP starts at each connection (see on_event).
     esp_sntp_config_t sntp = ESP_NETIF_SNTP_DEFAULT_CONFIG(ntp_server);
     sntp.start = false;
     sntp.sync_cb = on_time_sync;
@@ -494,4 +494,9 @@ int net_last_reason(void)
 unsigned net_sync_count(void)
 {
     return s_sync_count;
+}
+
+time_t net_sync_time(void)
+{
+    return s_sync_at;
 }

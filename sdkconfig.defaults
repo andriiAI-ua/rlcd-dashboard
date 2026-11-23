@@ -38,5 +38,9 @@ CONFIG_PM_ENABLE=y
 CONFIG_FREERTOS_USE_TICKLESS_IDLE=y
 CONFIG_USJ_NO_AUTO_LS_ON_CONNECTION=y
 
+# SNTP asks for the time at once after each Wi-Fi connection, without a random delay: the eco sessions
+# are short.
+# CONFIG_LWIP_SNTP_STARTUP_DELAY is not set
+
 # Home Assistant, its entities, the forecast city and the other values of your home network: on the settings
 # page of the device (the first-start wizard), or in sdkconfig.secrets (see sdkconfig.secrets.example).

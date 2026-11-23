@@ -977,6 +977,51 @@ static bool tz_read(void)
     return hadata_get_tz(&tz) != s_tz_before;
 }
 
+/* Time */
+
+// The largest difference between the system time and the clock chip that stays without a correction.
+#define CHIP_MAX_ERROR_MS 500
+// A session waits up to this time for the network time.
+#define NTP_WAIT_MS       3000
+
+static unsigned s_sync_before;  // the count of the time synchronizations before the session
+
+static bool time_synced(void)
+{
+    return net_sync_count() != s_sync_before;
+}
+
+// Between the network synchronizations the clock chip keeps the time. In light sleep the system time comes
+// from the internal RC oscillator of the ESP32-S3, which is not accurate. If the system time is more than
+// CHIP_MAX_ERROR_MS away from the chip, set it from the chip.
+static void follow_clock_chip(void)
+{
+    if (rtc_clock_kind() == RTC_CLOCK_NONE) {
+        return;
+    }
+    const unsigned synced = net_sync_count();
+    time_t chip;
+    if (rtc_clock_read(&chip) != ESP_OK) {
+        return;
+    }
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    // The chip shows whole seconds: the real time is between chip and chip + 1 s.
+    const int64_t diff_ms = ((int64_t)tv.tv_sec - chip) * 1000 + tv.tv_usec / 1000;
+    if (diff_ms >= -CHIP_MAX_ERROR_MS && diff_ms <= 1000 + CHIP_MAX_ERROR_MS) {
+        return;
+    }
+    // Take the start of the next chip second: then the system time is correct to some milliseconds.
+    if (rtc_clock_read_edge(&chip) != ESP_OK || net_sync_count() != synced) {
+        return;     // no edge, or SNTP gave the time in the meantime
+    }
+    gettimeofday(&tv, NULL);
+    const int64_t error_ms = ((int64_t)tv.tv_sec - chip) * 1000 + tv.tv_usec / 1000;
+    const struct timeval set = { .tv_sec = chip };
+    settimeofday(&set, NULL);
+    ESP_LOGI(TAG, "Time from %s: the system time was %+lld ms off", rtc_clock_name(), (long long)error_ms);
+}
+
 // Return the milliseconds to the start of the next minute, plus a small margin.
 static uint32_t ms_to_next_minute(void)
 {
@@ -1040,6 +1085,14 @@ static void web_status(char *buf, size_t len)
             t.tm_hour, t.tm_min, s->time_source ? s->time_source : tr(T_STATUS_UNKNOWN));
     } else {
         LINE("%s", tr(T_STATUS_TIME_NOT_SET));
+    }
+    const time_t ntp = net_sync_time();
+    if (ntp) {
+        struct tm t;
+        localtime_r(&ntp, &t);
+        LINE(tr(T_STATUS_NTP), t.tm_mday, t.tm_mon + 1, t.tm_hour, t.tm_min);
+    } else {
+        LINE("%s", tr(T_STATUS_NTP_NEVER));
     }
     const ha_data_t *h = &s_last_ha;
     if (!h->configured) {
@@ -1392,6 +1445,7 @@ static bool session_stopped(void)
 // with the last data. A button stops the waits (see session_stopped()).
 static void eco_wake(void)
 {
+    s_sync_before = net_sync_count();
     net_resume();
     const bool wifi = wait_for(net_connected, ECO_WIFI_WAIT_MS);
     // MQTT after Wi-Fi: a first try without a network waits 10 s (reconnect_timeout_ms) for the next one, and
@@ -1447,6 +1501,9 @@ static void eco_wake(void)
     if (tz_asked) {
         wait_for(tz_read, TZ_WAIT_MS);
     }
+    // SNTP asks at the connection (see net.c); the answer usually comes during the data requests. The main loop
+    // writes the network time to the clock chip.
+    wait_for(time_synced, NTP_WAIT_MS);
     apply_requests();
 }
 
@@ -1674,6 +1731,7 @@ static void extreme_mode(ui_screen_t *screen, const char *time_source, ui_state_
     ESP_LOGW(TAG, "Battery under %d %%: extreme power saving", EXTREME_BATTERY);
     int day = -1;
     for (;;) {
+        follow_clock_chip();
         const time_t now = time(NULL);
         struct tm tm;
         localtime_r(&now, &tm);
@@ -1868,11 +1926,13 @@ void app_main(void)
             synced = count;
             time_source = "NTP";
             if (rtc_clock_kind() != RTC_CLOCK_NONE) {
-                const esp_err_t err = rtc_clock_write(time(NULL));
+                const esp_err_t err = rtc_clock_write_now();
                 if (err != ESP_OK) {
                     ESP_LOGW(TAG, "Cannot write the time to %s: %s", rtc_clock_name(), esp_err_to_name(err));
                 }
             }
+        } else {
+            follow_clock_chip();
         }
 
         update(screen, time_source, &state, &ha);
